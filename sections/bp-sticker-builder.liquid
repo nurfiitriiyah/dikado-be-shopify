@@ -1,0 +1,2061 @@
+{% comment %}
+  BP Sticker Builder — NEW independent section
+  ------------------------------------------------------------
+  Expected Shopify Metaobject definitions / type handles:
+  - character
+      fields: name, thumbnail
+  - character_pose
+      fields: name, character (metaobject reference -> character),
+              base_image, thumbnail
+  - character_item
+      fields: name, category, thumbnail
+  - character_item_asset
+      fields: item (metaobject reference -> character_item),
+              pose (metaobject reference -> character_pose),
+              image
+
+  IMPORTANT:
+  This section is intentionally isolated from any existing turnaround builder.
+  All selectors are scoped under #bp-builder-{{ section.id }} and use bp-builder-* classes.
+{% endcomment %}
+
+<section
+  id="bp-builder-{{ section.id }}"
+  class="bp-builder-section"
+  style="
+    --bp-accent: {{ section.settings.accent_color }};
+    --bp-accent-soft: {{ section.settings.accent_soft_color }};
+    --bp-surface: {{ section.settings.surface_color }};
+    --bp-canvas: {{ section.settings.canvas_color }};
+    --bp-text: {{ section.settings.text_color }};
+  "
+>
+  <div class="bp-builder-shell">
+    <!-- STEP 1: CHARACTER -->
+    <div class="bp-builder-view is-active" data-bp-view="character">
+      <div class="bp-builder-intro">
+        <p class="bp-builder-eyebrow">{{ section.settings.eyebrow }}</p>
+        <h2 class="bp-builder-title">{{ section.settings.choose_title }}</h2>
+        <p class="bp-builder-subtitle">{{ section.settings.choose_subtitle }}</p>
+      </div>
+
+      <div class="bp-builder-character-grid" data-bp-character-grid></div>
+
+      <div class="bp-builder-step-actions">
+        <button
+          class="bp-builder-primary-btn"
+          type="button"
+          data-bp-continue-character
+          disabled
+        >
+          Choose a Buddy first
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 2: POSE -->
+    <div class="bp-builder-view" data-bp-view="pose" hidden>
+      <div class="bp-builder-topbar">
+        <button class="bp-builder-back-btn" type="button" data-bp-back-to-character>
+          <span aria-hidden="true">←</span>
+          Back
+        </button>
+        <div class="bp-builder-topbar-copy">
+          <p class="bp-builder-eyebrow">Step 2</p>
+          <h2 class="bp-builder-title bp-builder-title--compact" data-bp-pose-title>Choose a Pose</h2>
+        </div>
+        <span class="bp-builder-topbar-spacer" aria-hidden="true"></span>
+      </div>
+
+      <p class="bp-builder-subtitle bp-builder-subtitle--center">
+        Pick the pose you want to dress up.
+      </p>
+
+      <div class="bp-builder-pose-grid" data-bp-pose-grid></div>
+
+      <div class="bp-builder-step-actions">
+        <button
+          class="bp-builder-primary-btn"
+          type="button"
+          data-bp-start-dressing
+          disabled
+        >
+          Choose a Pose first
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 3: CUSTOMIZE -->
+    <div class="bp-builder-view" data-bp-view="builder" hidden>
+      <div class="bp-builder-topbar bp-builder-topbar--builder">
+        <button class="bp-builder-back-btn" type="button" data-bp-back-to-pose>
+          <span aria-hidden="true">←</span>
+          Back
+        </button>
+
+        <div class="bp-builder-topbar-copy">
+          <p class="bp-builder-eyebrow">Dress-up mode</p>
+          <h2 class="bp-builder-title bp-builder-title--compact" data-bp-builder-title>
+            Customize your Buddy
+          </h2>
+        </div>
+
+        <button class="bp-builder-save-btn" type="button" data-bp-save>
+          Save Buddy
+        </button>
+      </div>
+
+      <div class="bp-builder-pose-summary">
+        <div class="bp-builder-pose-summary-copy">
+          <span class="bp-builder-pose-summary-label">Current pose</span>
+          <strong data-bp-current-pose>—</strong>
+        </div>
+        <button class="bp-builder-link-btn" type="button" data-bp-change-pose>
+          Change pose
+        </button>
+      </div>
+
+      <div class="bp-builder-workspace">
+        <!-- LEFT: CATEGORY -->
+        <aside class="bp-builder-category-panel" aria-label="Sticker categories">
+          <p class="bp-builder-panel-label">Categories</p>
+          <div class="bp-builder-category-list" data-bp-category-list></div>
+        </aside>
+
+        <!-- CENTER: ITEM LIBRARY -->
+        <section class="bp-builder-library-panel">
+          <div class="bp-builder-panel-heading">
+            <div>
+              <p class="bp-builder-panel-label">Sticker library</p>
+              <h3 class="bp-builder-panel-title" data-bp-library-title>Outfit</h3>
+            </div>
+            <span class="bp-builder-item-count" data-bp-item-count>0 items</span>
+          </div>
+
+          <div class="bp-builder-item-grid" data-bp-item-grid></div>
+
+          <div class="bp-builder-empty-state" data-bp-empty-state hidden>
+            <span class="bp-builder-empty-emoji" aria-hidden="true">✨</span>
+            <p data-bp-empty-copy>No items for this pose yet ✨</p>
+          </div>
+        </section>
+
+        <!-- RIGHT: CANVAS -->
+        <section class="bp-builder-canvas-panel">
+          <div class="bp-builder-canvas-toolbar">
+            <span class="bp-builder-canvas-hint">Tap an item, then drag it around.</span>
+
+            <div class="bp-builder-toolbar-actions">
+              <button type="button" class="bp-builder-tool-btn" data-bp-undo disabled title="Undo">
+                ↶ <span>Undo</span>
+              </button>
+              <button type="button" class="bp-builder-tool-btn" data-bp-redo disabled title="Redo">
+                ↷ <span>Redo</span>
+              </button>
+              <button type="button" class="bp-builder-tool-btn" data-bp-reset title="Reset">
+                ↺ <span>Reset</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="bp-builder-canvas-wrap">
+            <div class="bp-builder-canvas" data-bp-canvas>
+              <div class="bp-builder-speech-bubble" data-bp-bubble hidden>
+                Hi! Dress me up!
+              </div>
+
+              <img
+                class="bp-builder-base-character"
+                data-bp-base-character
+                src=""
+                alt=""
+                draggable="false"
+              >
+
+              <div class="bp-builder-sticker-layer" data-bp-sticker-layer></div>
+            </div>
+          </div>
+
+          <p class="bp-builder-mobile-help">
+            Drag stickers to move them. Use the corner handle to resize and the round handle to rotate.
+          </p>
+        </section>
+      </div>
+
+      <div class="bp-builder-mobile-save-wrap">
+        <button class="bp-builder-primary-btn bp-builder-primary-btn--full" type="button" data-bp-mobile-save>
+          Save Buddy
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHOPIFY METAOBJECT DATA -->
+  <script type="application/json" data-bp-characters>
+    [
+      {% assign bp_characters = shop.metaobjects.character.values %}
+      {% for character in bp_characters %}
+        {
+          "id": {{ character.system.id | json }},
+          "handle": {{ character.system.handle | json }},
+          "name": {{ character.name.value | default: character.system.handle | json }},
+          "thumbnail": {% if character.thumbnail.value %}{{ character.thumbnail.value | image_url: width: 700 | json }}{% else %}null{% endif %}
+        }{% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    ]
+  </script>
+
+  <script type="application/json" data-bp-poses>
+    [
+      {% assign bp_poses = shop.metaobjects.character_pose.values %}
+      {% for pose in bp_poses %}
+        {
+          "id": {{ pose.system.id | json }},
+          "handle": {{ pose.system.handle | json }},
+          "name": {{ pose.name.value | default: pose.system.handle | json }},
+          "characterHandle": {% if pose.character.value %}{{ pose.character.value.system.handle | json }}{% else %}null{% endif %},
+          "baseImage": {% if pose.base_image.value %}{{ pose.base_image.value | image_url: width: 1400 | json }}{% else %}null{% endif %},
+          "thumbnail": {% if pose.thumbnail.value %}{{ pose.thumbnail.value | image_url: width: 700 | json }}{% elsif pose.base_image.value %}{{ pose.base_image.value | image_url: width: 700 | json }}{% else %}null{% endif %}
+        }{% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    ]
+  </script>
+
+  <script type="application/json" data-bp-items>
+    [
+      {% assign bp_items = shop.metaobjects.character_item.values %}
+      {% for item in bp_items %}
+        {
+          "id": {{ item.system.id | json }},
+          "handle": {{ item.system.handle | json }},
+          "name": {{ item.name.value | default: item.system.handle | json }},
+          "category": {{ item.category.value | default: 'Extras' | json }},
+          "thumbnail": {% if item.thumbnail.value %}{{ item.thumbnail.value | image_url: width: 700 | json }}{% else %}null{% endif %}
+        }{% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    ]
+  </script>
+
+  <script type="application/json" data-bp-assets>
+    [
+      {% assign bp_assets = shop.metaobjects.character_item_asset.values %}
+      {% for asset in bp_assets %}
+        {
+          "id": {{ asset.system.id | json }},
+          "handle": {{ asset.system.handle | json }},
+          "itemHandle": {% if asset.item.value %}{{ asset.item.value.system.handle | json }}{% else %}null{% endif %},
+          "poseHandle": {% if asset.pose.value %}{{ asset.pose.value.system.handle | json }}{% else %}null{% endif %},
+          "image": {% if asset.image.value %}{{ asset.image.value | image_url: width: 1400 | json }}{% else %}null{% endif %}
+        }{% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    ]
+  </script>
+
+  <style>
+    #bp-builder-{{ section.id }} {
+      --bp-radius-xl: 28px;
+      --bp-radius-lg: 22px;
+      --bp-radius-md: 16px;
+      --bp-border: rgba(38, 32, 54, 0.10);
+      --bp-border-strong: rgba(38, 32, 54, 0.18);
+      --bp-muted: rgba(38, 32, 54, 0.62);
+      --bp-shadow: 0 16px 50px rgba(50, 43, 76, 0.08);
+      --bp-shadow-soft: 0 8px 24px rgba(50, 43, 76, 0.08);
+      color: var(--bp-text);
+      background:
+        radial-gradient(circle at top left, color-mix(in srgb, var(--bp-accent-soft) 70%, transparent), transparent 32%),
+        var(--bp-surface);
+      padding: clamp(28px, 5vw, 72px) 18px;
+    }
+
+    #bp-builder-{{ section.id }} * {
+      box-sizing: border-box;
+    }
+
+    #bp-builder-{{ section.id }} button,
+    #bp-builder-{{ section.id }} input {
+      font: inherit;
+    }
+
+    #bp-builder-{{ section.id }} button {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-shell {
+      width: min(1240px, 100%);
+      margin: 0 auto;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-view[hidden] {
+      display: none !important;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-intro {
+      text-align: center;
+      max-width: 720px;
+      margin: 0 auto 34px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-eyebrow {
+      margin: 0 0 8px;
+      color: var(--bp-accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-title {
+      margin: 0;
+      color: var(--bp-text);
+      font-size: clamp(34px, 4vw, 58px);
+      line-height: 1.03;
+      letter-spacing: -0.035em;
+      font-weight: 800;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-title--compact {
+      font-size: clamp(26px, 3vw, 40px);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-subtitle {
+      margin: 14px 0 0;
+      color: var(--bp-muted);
+      font-size: clamp(15px, 1.6vw, 18px);
+      line-height: 1.6;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-subtitle--center {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    /* CHARACTER CARDS */
+    #bp-builder-{{ section.id }} .bp-builder-character-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 18px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-character-card,
+    #bp-builder-{{ section.id }} .bp-builder-pose-card {
+      position: relative;
+      appearance: none;
+      width: 100%;
+      border: 1.5px solid var(--bp-border);
+      border-radius: var(--bp-radius-lg);
+      background: rgba(255, 255, 255, 0.88);
+      color: var(--bp-text);
+      cursor: pointer;
+      padding: 16px;
+      text-align: left;
+      box-shadow: var(--bp-shadow-soft);
+      transition:
+        transform 180ms ease,
+        border-color 180ms ease,
+        box-shadow 180ms ease,
+        background 180ms ease;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-character-card:hover,
+    #bp-builder-{{ section.id }} .bp-builder-pose-card:hover {
+      transform: translateY(-5px);
+      border-color: color-mix(in srgb, var(--bp-accent) 38%, transparent);
+      box-shadow: 0 14px 32px rgba(50, 43, 76, 0.12);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-character-card.is-selected,
+    #bp-builder-{{ section.id }} .bp-builder-pose-card.is-selected {
+      border-color: var(--bp-accent);
+      box-shadow:
+        0 0 0 3px color-mix(in srgb, var(--bp-accent) 14%, transparent),
+        0 14px 32px rgba(50, 43, 76, 0.12);
+      background: color-mix(in srgb, var(--bp-accent-soft) 28%, white);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-character-thumb,
+    #bp-builder-{{ section.id }} .bp-builder-pose-thumb {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: calc(var(--bp-radius-lg) - 7px);
+      background:
+        radial-gradient(circle at 50% 38%, #ffffff, color-mix(in srgb, var(--bp-accent-soft) 34%, white));
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      margin-bottom: 13px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-character-thumb img,
+    #bp-builder-{{ section.id }} .bp-builder-pose-thumb img {
+      width: 88%;
+      height: 88%;
+      object-fit: contain;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-placeholder-art {
+      width: 72px;
+      height: 72px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: var(--bp-accent-soft);
+      font-size: 34px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-card-name {
+      display: block;
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-card-meta {
+      display: block;
+      margin-top: 4px;
+      color: var(--bp-muted);
+      font-size: 13px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-selected-badge {
+      position: absolute;
+      top: 26px;
+      right: 26px;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: var(--bp-accent);
+      color: white;
+      font-size: 15px;
+      font-weight: 900;
+      opacity: 0;
+      transform: scale(0.7);
+      transition: 180ms ease;
+    }
+
+    #bp-builder-{{ section.id }} .is-selected .bp-builder-selected-badge {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-step-actions {
+      display: flex;
+      justify-content: center;
+      margin-top: 28px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-primary-btn,
+    #bp-builder-{{ section.id }} .bp-builder-save-btn {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      background: var(--bp-accent);
+      color: white;
+      min-height: 50px;
+      padding: 0 24px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 10px 28px color-mix(in srgb, var(--bp-accent) 28%, transparent);
+      transition: transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-primary-btn:hover:not(:disabled),
+    #bp-builder-{{ section.id }} .bp-builder-save-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 34px color-mix(in srgb, var(--bp-accent) 34%, transparent);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-primary-btn:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* TOP BAR */
+    #bp-builder-{{ section.id }} .bp-builder-topbar {
+      display: grid;
+      grid-template-columns: minmax(110px, 1fr) auto minmax(110px, 1fr);
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 26px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-topbar-copy {
+      text-align: center;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-topbar-copy .bp-builder-eyebrow {
+      margin-bottom: 5px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-back-btn,
+    #bp-builder-{{ section.id }} .bp-builder-link-btn,
+    #bp-builder-{{ section.id }} .bp-builder-tool-btn {
+      appearance: none;
+      border: 1px solid var(--bp-border);
+      background: rgba(255,255,255,0.82);
+      color: var(--bp-text);
+      cursor: pointer;
+      border-radius: 999px;
+      min-height: 42px;
+      padding: 0 15px;
+      font-weight: 750;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-back-btn {
+      justify-self: start;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-back-btn:hover,
+    #bp-builder-{{ section.id }} .bp-builder-link-btn:hover,
+    #bp-builder-{{ section.id }} .bp-builder-tool-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      border-color: var(--bp-border-strong);
+      background: white;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-save-btn {
+      justify-self: end;
+      min-height: 44px;
+      padding-inline: 19px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-topbar-spacer {
+      display: block;
+      width: 110px;
+    }
+
+    /* POSES */
+    #bp-builder-{{ section.id }} .bp-builder-pose-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 18px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    /* BUILDER */
+    #bp-builder-{{ section.id }} .bp-builder-pose-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      background: rgba(255,255,255,0.75);
+      border: 1px solid var(--bp-border);
+      border-radius: var(--bp-radius-md);
+      padding: 11px 14px 11px 17px;
+      margin-bottom: 14px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-pose-summary-copy {
+      display: flex;
+      align-items: baseline;
+      gap: 9px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-pose-summary-label {
+      color: var(--bp-muted);
+      font-size: 13px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-link-btn {
+      min-height: 36px;
+      padding-inline: 13px;
+      font-size: 13px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-workspace {
+      display: grid;
+      grid-template-columns: minmax(130px, 0.8fr) minmax(280px, 1.5fr) minmax(420px, 2.35fr);
+      min-height: 650px;
+      border: 1px solid var(--bp-border);
+      border-radius: var(--bp-radius-xl);
+      overflow: hidden;
+      background: rgba(255,255,255,0.76);
+      box-shadow: var(--bp-shadow);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-category-panel,
+    #bp-builder-{{ section.id }} .bp-builder-library-panel {
+      border-right: 1px solid var(--bp-border);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-category-panel {
+      padding: 22px 14px;
+      background: color-mix(in srgb, var(--bp-accent-soft) 16%, white);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-library-panel {
+      padding: 22px;
+      overflow: auto;
+      max-height: 760px;
+      background: rgba(255,255,255,0.78);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-panel-label {
+      margin: 0 0 11px;
+      color: var(--bp-muted);
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-category-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-category {
+      appearance: none;
+      border: 1px solid transparent;
+      border-radius: 14px;
+      width: 100%;
+      min-height: 58px;
+      padding: 10px 9px;
+      background: transparent;
+      color: var(--bp-muted);
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      align-items: center;
+      gap: 8px;
+      text-align: left;
+      cursor: pointer;
+      font-weight: 750;
+      transition: 160ms ease;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-category:hover {
+      background: rgba(255,255,255,0.78);
+      color: var(--bp-text);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-category.is-active {
+      color: var(--bp-text);
+      background: white;
+      border-color: color-mix(in srgb, var(--bp-accent) 28%, transparent);
+      box-shadow: 0 7px 18px rgba(50,43,76,0.07);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-category-icon {
+      font-size: 20px;
+      line-height: 1;
+      text-align: center;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-panel-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-panel-heading .bp-builder-panel-label {
+      margin-bottom: 3px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-panel-title {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.1;
+      font-weight: 850;
+      letter-spacing: -0.02em;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-item-count {
+      white-space: nowrap;
+      color: var(--bp-muted);
+      font-size: 12px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-item-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-item-card {
+      appearance: none;
+      border: 1px solid var(--bp-border);
+      border-radius: 15px;
+      background: white;
+      padding: 10px;
+      color: var(--bp-text);
+      text-align: left;
+      cursor: pointer;
+      transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-item-card:hover {
+      transform: translateY(-3px);
+      border-color: color-mix(in srgb, var(--bp-accent) 32%, transparent);
+      box-shadow: var(--bp-shadow-soft);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-item-thumb {
+      display: grid;
+      place-items: center;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      border-radius: 11px;
+      margin-bottom: 9px;
+      background:
+        linear-gradient(45deg, rgba(120,120,140,0.04) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(120,120,140,0.04) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(120,120,140,0.04) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(120,120,140,0.04) 75%);
+      background-size: 18px 18px;
+      background-position: 0 0, 0 9px, 9px -9px, -9px 0px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-item-thumb img {
+      width: 88%;
+      height: 88%;
+      object-fit: contain;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-item-name {
+      display: block;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.3;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-empty-state {
+      text-align: center;
+      padding: 58px 16px;
+      color: var(--bp-muted);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-empty-emoji {
+      display: block;
+      font-size: 32px;
+      margin-bottom: 10px;
+    }
+
+    /* CANVAS */
+    #bp-builder-{{ section.id }} .bp-builder-canvas-panel {
+      min-width: 0;
+      padding: 18px;
+      background: color-mix(in srgb, var(--bp-canvas) 88%, white);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-canvas-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      min-height: 44px;
+      margin-bottom: 12px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-canvas-hint {
+      color: var(--bp-muted);
+      font-size: 12px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-toolbar-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-tool-btn {
+      min-height: 36px;
+      padding-inline: 11px;
+      font-size: 12px;
+      background: rgba(255,255,255,0.78);
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-tool-btn:disabled {
+      opacity: 0.34;
+      cursor: not-allowed;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-canvas-wrap {
+      display: grid;
+      place-items: center;
+      min-height: 560px;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-canvas {
+      position: relative;
+      width: min(100%, 590px);
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      border: 1px solid var(--bp-border);
+      border-radius: 24px;
+      background-color: #fff;
+      background-image: radial-gradient(circle, rgba(68, 58, 95, 0.10) 1.25px, transparent 1.25px);
+      background-size: 22px 22px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.65), var(--bp-shadow-soft);
+      touch-action: none;
+      user-select: none;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-base-character {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 82%;
+      height: 82%;
+      object-fit: contain;
+      transform: translate(-50%, -50%);
+      user-select: none;
+      pointer-events: none;
+      -webkit-user-drag: none;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-sticker-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-sticker {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 26%;
+      aspect-ratio: 1 / 1;
+      display: grid;
+      place-items: center;
+      transform-origin: center;
+      pointer-events: auto;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-sticker:active {
+      cursor: grabbing;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-sticker img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+      filter: drop-shadow(0 4px 3px rgba(30, 24, 45, 0.05));
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-sticker-outline {
+      position: absolute;
+      inset: -6px;
+      border: 1.5px dashed var(--bp-accent);
+      border-radius: 10px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-sticker.is-selected .bp-builder-sticker-outline {
+      opacity: 1;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-sticker-control {
+      position: absolute;
+      touch-action: none;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: var(--bp-accent);
+      box-shadow: 0 5px 15px rgba(30, 24, 45, 0.18);
+      opacity: 0;
+      pointer-events: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-sticker.is-selected .bp-builder-sticker-control {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-delete-handle {
+      top: -18px;
+      left: -18px;
+      background: #ef5d6f;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-resize-handle {
+      right: -18px;
+      bottom: -18px;
+      cursor: nwse-resize;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-rotate-handle {
+      right: -18px;
+      top: -18px;
+      cursor: grab;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-speech-bubble {
+      position: absolute;
+      z-index: 200;
+      left: 60%;
+      top: 14%;
+      max-width: 170px;
+      padding: 11px 14px;
+      border-radius: 16px 16px 16px 5px;
+      background: white;
+      color: var(--bp-text);
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.25;
+      box-shadow: 0 10px 28px rgba(50,43,76,0.14);
+      pointer-events: none;
+      animation: bp-builder-bubble-pop-{{ section.id }} 360ms cubic-bezier(.2,.9,.25,1.2) both;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-speech-bubble::after {
+      content: "";
+      position: absolute;
+      left: 10px;
+      bottom: -8px;
+      border-style: solid;
+      border-width: 9px 9px 0 0;
+      border-color: white transparent transparent transparent;
+    }
+
+    @keyframes bp-builder-bubble-pop-{{ section.id }} {
+      from { opacity: 0; transform: translateY(8px) scale(0.88); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-mobile-help {
+      display: none;
+      color: var(--bp-muted);
+      font-size: 12px;
+      line-height: 1.5;
+      margin: 11px 0 0;
+      text-align: center;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-mobile-save-wrap {
+      display: none;
+    }
+
+    #bp-builder-{{ section.id }} .bp-builder-primary-btn--full {
+      width: 100%;
+    }
+
+    @media (max-width: 980px) {
+      #bp-builder-{{ section.id }} .bp-builder-workspace {
+        grid-template-columns: 132px 260px minmax(380px, 1fr);
+        overflow-x: auto;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-canvas-wrap {
+        min-height: 520px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      #bp-builder-{{ section.id }} {
+        padding: 28px 12px 44px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-character-grid,
+      #bp-builder-{{ section.id }} .bp-builder-pose-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-topbar {
+        grid-template-columns: auto 1fr auto;
+        gap: 9px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-topbar .bp-builder-eyebrow {
+        display: none;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-title--compact {
+        font-size: 22px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-back-btn {
+        min-height: 39px;
+        padding-inline: 11px;
+        font-size: 13px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-save-btn {
+        display: none;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-topbar--builder {
+        grid-template-columns: auto 1fr;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-pose-summary {
+        margin-bottom: 12px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-workspace {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: visible;
+        border-radius: 22px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-canvas-panel {
+        order: 1;
+        padding: 12px;
+        border-bottom: 1px solid var(--bp-border);
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-category-panel {
+        order: 2;
+        border-right: 0;
+        border-bottom: 1px solid var(--bp-border);
+        padding: 12px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-library-panel {
+        order: 3;
+        border-right: 0;
+        padding: 15px;
+        max-height: none;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-category-panel > .bp-builder-panel-label {
+        display: none;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-category-list {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding-bottom: 2px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-category-list::-webkit-scrollbar {
+        display: none;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-category {
+        flex: 0 0 auto;
+        min-height: 43px;
+        width: auto;
+        grid-template-columns: 21px auto;
+        border: 1px solid var(--bp-border);
+        background: rgba(255,255,255,0.72);
+        padding: 8px 12px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-category-icon {
+        font-size: 17px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-canvas-toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-toolbar-actions {
+        width: 100%;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-tool-btn {
+        flex: 1;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-canvas-wrap {
+        min-height: 0;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-canvas {
+        width: 100%;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-mobile-help {
+        display: block;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-mobile-save-wrap {
+        display: block;
+        margin-top: 14px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-item-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 480px) {
+      #bp-builder-{{ section.id }} .bp-builder-character-grid,
+      #bp-builder-{{ section.id }} .bp-builder-pose-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-character-card,
+      #bp-builder-{{ section.id }} .bp-builder-pose-card {
+        padding: 10px;
+        border-radius: 17px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-card-name {
+        font-size: 14px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-card-meta {
+        font-size: 11px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-item-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-tool-btn span {
+        display: none;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-pose-summary-copy {
+        display: grid;
+        gap: 1px;
+      }
+
+      #bp-builder-{{ section.id }} .bp-builder-speech-bubble {
+        left: 54%;
+        top: 10%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #bp-builder-{{ section.id }} *,
+      #bp-builder-{{ section.id }} *::before,
+      #bp-builder-{{ section.id }} *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+  </style>
+
+  <script>
+    (() => {
+      const root = document.getElementById('bp-builder-{{ section.id }}');
+      if (!root || root.dataset.bpInitialized === 'true') return;
+      root.dataset.bpInitialized = 'true';
+
+      const sectionId = {{ section.id | json }};
+      const parseData = (selector) => {
+        try {
+          return JSON.parse(root.querySelector(selector)?.textContent || '[]');
+        } catch (error) {
+          console.error('[BP Builder] Failed parsing', selector, error);
+          return [];
+        }
+      };
+
+      const characters = parseData('[data-bp-characters]');
+      const poses = parseData('[data-bp-poses]');
+      const items = parseData('[data-bp-items]');
+      const assets = parseData('[data-bp-assets]');
+
+      const els = {
+        views: [...root.querySelectorAll('[data-bp-view]')],
+        characterGrid: root.querySelector('[data-bp-character-grid]'),
+        continueCharacter: root.querySelector('[data-bp-continue-character]'),
+        backToCharacter: root.querySelector('[data-bp-back-to-character]'),
+        poseTitle: root.querySelector('[data-bp-pose-title]'),
+        poseGrid: root.querySelector('[data-bp-pose-grid]'),
+        startDressing: root.querySelector('[data-bp-start-dressing]'),
+        backToPose: root.querySelector('[data-bp-back-to-pose]'),
+        builderTitle: root.querySelector('[data-bp-builder-title]'),
+        currentPose: root.querySelector('[data-bp-current-pose]'),
+        changePose: root.querySelector('[data-bp-change-pose]'),
+        categoryList: root.querySelector('[data-bp-category-list]'),
+        libraryTitle: root.querySelector('[data-bp-library-title]'),
+        itemCount: root.querySelector('[data-bp-item-count]'),
+        itemGrid: root.querySelector('[data-bp-item-grid]'),
+        emptyState: root.querySelector('[data-bp-empty-state]'),
+        emptyCopy: root.querySelector('[data-bp-empty-copy]'),
+        canvas: root.querySelector('[data-bp-canvas]'),
+        baseCharacter: root.querySelector('[data-bp-base-character]'),
+        stickerLayer: root.querySelector('[data-bp-sticker-layer]'),
+        bubble: root.querySelector('[data-bp-bubble]'),
+        undo: root.querySelector('[data-bp-undo]'),
+        redo: root.querySelector('[data-bp-redo]'),
+        reset: root.querySelector('[data-bp-reset]'),
+        saveButtons: [...root.querySelectorAll('[data-bp-save], [data-bp-mobile-save]')]
+      };
+
+      const CATEGORY_ICON_MAP = {
+        outfit: '👗',
+        outfits: '👗',
+        head: '🎩',
+        hat: '🎩',
+        hats: '🎩',
+        neck: '🧣',
+        scarf: '🧣',
+        accessories: '✨',
+        accessory: '✨',
+        props: '🎁',
+        prop: '🎁',
+        extras: '⭐',
+        extra: '⭐'
+      };
+
+      const state = {
+        step: 'character',
+        selectedCharacter: null,
+        selectedPose: null,
+        selectedCategory: null,
+        stickers: [],
+        activeStickerId: null,
+        undoStack: [],
+        redoStack: [],
+        bubbleTimer: null
+      };
+
+      const normalizeCategory = (value) => String(value || 'Extras').trim();
+      const keyCategory = (value) => normalizeCategory(value).toLowerCase();
+
+      const getItemByHandle = (handle) => items.find((item) => item.handle === handle);
+      const getPoseByHandle = (handle) => poses.find((pose) => pose.handle === handle);
+
+      const escapeHtml = (value) =>
+        String(value ?? '')
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#039;');
+
+      function showView(name) {
+        state.step = name;
+        els.views.forEach((view) => {
+          const active = view.dataset.bpView === name;
+          view.hidden = !active;
+          view.classList.toggle('is-active', active);
+        });
+        root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      function characterCardMarkup(character) {
+        const thumb = character.thumbnail
+          ? `<img src="${escapeHtml(character.thumbnail)}" alt="${escapeHtml(character.name)}" loading="lazy">`
+          : `<div class="bp-builder-placeholder-art" aria-hidden="true">🧸</div>`;
+
+        return `
+          <button
+            type="button"
+            class="bp-builder-character-card"
+            data-bp-character="${escapeHtml(character.handle)}"
+            aria-pressed="false"
+          >
+            <span class="bp-builder-selected-badge" aria-hidden="true">✓</span>
+            <span class="bp-builder-character-thumb">${thumb}</span>
+            <span class="bp-builder-card-name">${escapeHtml(character.name)}</span>
+            <span class="bp-builder-card-meta">Tap to select</span>
+          </button>
+        `;
+      }
+
+      function renderCharacters() {
+        if (!characters.length) {
+          els.characterGrid.innerHTML = `
+            <div class="bp-builder-empty-state" style="grid-column:1/-1">
+              <span class="bp-builder-empty-emoji">🧸</span>
+              <p>No Character metaobject entries found yet.</p>
+            </div>
+          `;
+          return;
+        }
+
+        els.characterGrid.innerHTML = characters.map(characterCardMarkup).join('');
+
+        els.characterGrid.querySelectorAll('[data-bp-character]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const selected = characters.find((character) => character.handle === button.dataset.bpCharacter);
+            if (!selected) return;
+
+            const changedCharacter = state.selectedCharacter?.handle !== selected.handle;
+            state.selectedCharacter = selected;
+
+            if (changedCharacter) {
+              state.selectedPose = null;
+              clearStickers(false);
+            }
+
+            els.characterGrid.querySelectorAll('[data-bp-character]').forEach((card) => {
+              const isSelected = card.dataset.bpCharacter === selected.handle;
+              card.classList.toggle('is-selected', isSelected);
+              card.setAttribute('aria-pressed', String(isSelected));
+            });
+
+            els.continueCharacter.disabled = false;
+            els.continueCharacter.textContent = `Continue with ${selected.name} →`;
+          });
+        });
+      }
+
+      function renderPoses() {
+        const character = state.selectedCharacter;
+        if (!character) return;
+
+        const available = poses.filter((pose) => pose.characterHandle === character.handle);
+        els.poseTitle.textContent = `Customize your ${character.name}`;
+
+        if (!available.length) {
+          els.poseGrid.innerHTML = `
+            <div class="bp-builder-empty-state" style="grid-column:1/-1">
+              <span class="bp-builder-empty-emoji">🪄</span>
+              <p>No poses found for ${escapeHtml(character.name)}.</p>
+            </div>
+          `;
+          els.startDressing.disabled = true;
+          els.startDressing.textContent = 'No poses available';
+          return;
+        }
+
+        els.poseGrid.innerHTML = available.map((pose) => {
+          const thumb = pose.thumbnail
+            ? `<img src="${escapeHtml(pose.thumbnail)}" alt="${escapeHtml(pose.name)}" loading="lazy">`
+            : `<div class="bp-builder-placeholder-art" aria-hidden="true">✨</div>`;
+
+          return `
+            <button
+              type="button"
+              class="bp-builder-pose-card ${state.selectedPose?.handle === pose.handle ? 'is-selected' : ''}"
+              data-bp-pose="${escapeHtml(pose.handle)}"
+              aria-pressed="${state.selectedPose?.handle === pose.handle ? 'true' : 'false'}"
+            >
+              <span class="bp-builder-selected-badge" aria-hidden="true">✓</span>
+              <span class="bp-builder-pose-thumb">${thumb}</span>
+              <span class="bp-builder-card-name">${escapeHtml(pose.name)}</span>
+              <span class="bp-builder-card-meta">Choose this pose</span>
+            </button>
+          `;
+        }).join('');
+
+        els.poseGrid.querySelectorAll('[data-bp-pose]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const pose = poses.find((candidate) => candidate.handle === button.dataset.bpPose);
+            if (!pose) return;
+
+            const changedPose = state.selectedPose?.handle !== pose.handle;
+            state.selectedPose = pose;
+
+            if (changedPose) clearStickers(false);
+
+            els.poseGrid.querySelectorAll('[data-bp-pose]').forEach((card) => {
+              const isSelected = card.dataset.bpPose === pose.handle;
+              card.classList.toggle('is-selected', isSelected);
+              card.setAttribute('aria-pressed', String(isSelected));
+            });
+
+            els.startDressing.disabled = false;
+            els.startDressing.textContent = 'Start Dressing →';
+          });
+        });
+
+        if (state.selectedPose && available.some((pose) => pose.handle === state.selectedPose.handle)) {
+          els.startDressing.disabled = false;
+          els.startDressing.textContent = 'Start Dressing →';
+        } else {
+          els.startDressing.disabled = true;
+          els.startDressing.textContent = 'Choose a Pose first';
+        }
+      }
+
+      function getAssetsForCurrentPose() {
+        if (!state.selectedPose) return [];
+        return assets.filter(
+          (asset) =>
+            asset.poseHandle === state.selectedPose.handle &&
+            asset.itemHandle &&
+            asset.image &&
+            getItemByHandle(asset.itemHandle)
+        );
+      }
+
+      function getCategoriesForCurrentPose() {
+        const seen = new Map();
+        getAssetsForCurrentPose().forEach((asset) => {
+          const item = getItemByHandle(asset.itemHandle);
+          if (!item) return;
+
+          const display = normalizeCategory(item.category);
+          const key = keyCategory(display);
+          if (!seen.has(key)) seen.set(key, display);
+        });
+        return [...seen.values()];
+      }
+
+      function renderCategories() {
+        const categories = getCategoriesForCurrentPose();
+
+        if (!categories.length) {
+          state.selectedCategory = null;
+          els.categoryList.innerHTML = `<span style="color:var(--bp-muted);font-size:13px;">No categories yet.</span>`;
+          renderItems();
+          return;
+        }
+
+        if (!state.selectedCategory || !categories.some(
+          (category) => keyCategory(category) === keyCategory(state.selectedCategory)
+        )) {
+          state.selectedCategory = categories[0];
+        }
+
+        els.categoryList.innerHTML = categories.map((category) => {
+          const key = keyCategory(category);
+          const icon = CATEGORY_ICON_MAP[key] || '✨';
+          const active = key === keyCategory(state.selectedCategory);
+
+          return `
+            <button
+              type="button"
+              class="bp-builder-category ${active ? 'is-active' : ''}"
+              data-bp-category="${escapeHtml(category)}"
+            >
+              <span class="bp-builder-category-icon" aria-hidden="true">${icon}</span>
+              <span>${escapeHtml(category)}</span>
+            </button>
+          `;
+        }).join('');
+
+        els.categoryList.querySelectorAll('[data-bp-category]').forEach((button) => {
+          button.addEventListener('click', () => {
+            state.selectedCategory = button.dataset.bpCategory;
+            renderCategories();
+            renderItems();
+          });
+        });
+      }
+
+      function renderItems() {
+        const currentAssets = getAssetsForCurrentPose();
+        const categoryKey = keyCategory(state.selectedCategory);
+
+        const compatible = currentAssets.filter((asset) => {
+          const item = getItemByHandle(asset.itemHandle);
+          return item && keyCategory(item.category) === categoryKey;
+        });
+
+        els.libraryTitle.textContent = state.selectedCategory || 'Stickers';
+        els.itemCount.textContent = `${compatible.length} ${compatible.length === 1 ? 'item' : 'items'}`;
+
+        if (!compatible.length) {
+          els.itemGrid.innerHTML = '';
+          els.emptyState.hidden = false;
+          els.emptyCopy.textContent = state.selectedCategory
+            ? `No ${state.selectedCategory.toLowerCase()} items for this pose yet ✨`
+            : 'No items for this pose yet ✨';
+          return;
+        }
+
+        els.emptyState.hidden = true;
+
+        els.itemGrid.innerHTML = compatible.map((asset) => {
+          const item = getItemByHandle(asset.itemHandle);
+          const thumb = item?.thumbnail || asset.image;
+
+          return `
+            <button
+              type="button"
+              class="bp-builder-item-card"
+              data-bp-asset="${escapeHtml(asset.handle)}"
+              title="Add ${escapeHtml(item?.name || 'sticker')}"
+            >
+              <span class="bp-builder-item-thumb">
+                <img
+                  src="${escapeHtml(thumb)}"
+                  alt="${escapeHtml(item?.name || 'Sticker')}"
+                  loading="lazy"
+                >
+              </span>
+              <span class="bp-builder-item-name">${escapeHtml(item?.name || 'Sticker')}</span>
+            </button>
+          `;
+        }).join('');
+
+        els.itemGrid.querySelectorAll('[data-bp-asset]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const asset = assets.find((candidate) => candidate.handle === button.dataset.bpAsset);
+            if (asset) addSticker(asset);
+          });
+        });
+      }
+
+      function enterBuilder() {
+        if (!state.selectedCharacter || !state.selectedPose) return;
+
+        els.builderTitle.textContent = `Customize your ${state.selectedCharacter.name}`;
+        els.currentPose.textContent = state.selectedPose.name;
+        els.baseCharacter.src = state.selectedPose.baseImage || state.selectedPose.thumbnail || '';
+        els.baseCharacter.alt = `${state.selectedCharacter.name} - ${state.selectedPose.name}`;
+
+        state.selectedCategory = null;
+        renderCategories();
+        renderItems();
+        renderStickers();
+        showView('builder');
+        showBubble();
+      }
+
+      function showBubble() {
+        if (!els.bubble) return;
+        window.clearTimeout(state.bubbleTimer);
+        els.bubble.hidden = false;
+        state.bubbleTimer = window.setTimeout(() => {
+          els.bubble.hidden = true;
+        }, 4200);
+      }
+
+      function hideBubble() {
+        window.clearTimeout(state.bubbleTimer);
+        if (els.bubble) els.bubble.hidden = true;
+      }
+
+      function cloneStickerState() {
+        return state.stickers.map((sticker) => ({ ...sticker }));
+      }
+
+      function pushHistory() {
+        state.undoStack.push(cloneStickerState());
+        if (state.undoStack.length > 40) state.undoStack.shift();
+        state.redoStack = [];
+        updateHistoryControls();
+      }
+
+      function restoreSnapshot(snapshot) {
+        state.stickers = snapshot.map((sticker) => ({ ...sticker }));
+        state.activeStickerId = null;
+        renderStickers();
+        updateHistoryControls();
+      }
+
+      function updateHistoryControls() {
+        els.undo.disabled = state.undoStack.length === 0;
+        els.redo.disabled = state.redoStack.length === 0;
+      }
+
+      function clearStickers(withHistory = true) {
+        if (withHistory && state.stickers.length) pushHistory();
+        state.stickers = [];
+        state.activeStickerId = null;
+        renderStickers();
+      }
+
+      function addSticker(asset) {
+        const item = getItemByHandle(asset.itemHandle);
+        if (!item || !asset.image) return;
+
+        pushHistory();
+        hideBubble();
+
+        const offset = (state.stickers.length % 5) * 2.8;
+        const sticker = {
+          instanceId: `bp-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          assetId: asset.id,
+          assetHandle: asset.handle,
+          itemId: item.id,
+          itemHandle: item.handle,
+          image: asset.image,
+          name: item.name,
+          x: 50 + offset,
+          y: 48 + offset,
+          scale: 1,
+          rotation: 0
+        };
+
+        state.stickers.push(sticker);
+        state.activeStickerId = sticker.instanceId;
+        renderStickers();
+      }
+
+      function syncStickerSelectionUI() {
+        if (!els.stickerLayer) return;
+
+        els.stickerLayer
+          .querySelectorAll('[data-bp-sticker-id]')
+          .forEach((stickerNode) => {
+            const isSelected =
+              stickerNode.dataset.bpStickerId === state.activeStickerId;
+
+            stickerNode.classList.toggle('is-selected', isSelected);
+            stickerNode.setAttribute(
+              'aria-pressed',
+              isSelected ? 'true' : 'false'
+            );
+          });
+      }
+
+      function selectSticker(instanceId) {
+        /*
+          IMPORTANT:
+          Do NOT call renderStickers() here.
+
+          renderStickers() replaces the sticker DOM nodes. If we replace the
+          element during pointerdown, the browser loses the element that owns
+          pointer capture and drag / resize / rotate immediately stops.
+        */
+        state.activeStickerId = instanceId;
+        syncStickerSelectionUI();
+      }
+
+      function renderStickers() {
+        if (!els.stickerLayer) return;
+
+        els.stickerLayer.innerHTML = state.stickers.map((sticker, index) => `
+          <div
+            class="bp-builder-sticker ${state.activeStickerId === sticker.instanceId ? 'is-selected' : ''}"
+            data-bp-sticker-id="${escapeHtml(sticker.instanceId)}"
+            style="
+              left:${Number(sticker.x).toFixed(3)}%;
+              top:${Number(sticker.y).toFixed(3)}%;
+              transform:translate(-50%,-50%) rotate(${Number(sticker.rotation).toFixed(2)}deg) scale(${Number(sticker.scale).toFixed(4)});
+              z-index:${10 + index};
+            "
+            role="button"
+            tabindex="0"
+            aria-pressed="${state.activeStickerId === sticker.instanceId ? 'true' : 'false'}"
+            aria-label="${escapeHtml(sticker.name || 'Sticker')}"
+          >
+            <img src="${escapeHtml(sticker.image)}" alt="" draggable="false">
+
+            <span class="bp-builder-sticker-outline" aria-hidden="true"></span>
+
+            <button
+              type="button"
+              class="bp-builder-sticker-control bp-builder-delete-handle"
+              data-bp-delete-sticker
+              title="Delete sticker"
+              aria-label="Delete sticker"
+            >×</button>
+
+            <button
+              type="button"
+              class="bp-builder-sticker-control bp-builder-rotate-handle"
+              data-bp-rotate-sticker
+              title="Rotate sticker"
+              aria-label="Rotate sticker"
+            >↻</button>
+
+            <button
+              type="button"
+              class="bp-builder-sticker-control bp-builder-resize-handle"
+              data-bp-resize-sticker
+              title="Resize sticker"
+              aria-label="Resize sticker"
+            >↘</button>
+          </div>
+        `).join('');
+
+        els.stickerLayer.querySelectorAll('[data-bp-sticker-id]').forEach(bindStickerEvents);
+      }
+
+      function bindStickerEvents(node) {
+        const instanceId = node.dataset.bpStickerId;
+
+        node.addEventListener('pointerdown', (event) => {
+          if (event.target.closest('[data-bp-delete-sticker], [data-bp-resize-sticker], [data-bp-rotate-sticker]')) {
+            return;
+          }
+
+          const sticker = state.stickers.find((candidate) => candidate.instanceId === instanceId);
+          if (!sticker) return;
+
+          event.preventDefault();
+          event.stopPropagation();
+          selectSticker(instanceId);
+          pushHistory();
+
+          const canvasRect = els.canvas.getBoundingClientRect();
+          const startX = event.clientX;
+          const startY = event.clientY;
+          const originalX = sticker.x;
+          const originalY = sticker.y;
+
+          node.setPointerCapture(event.pointerId);
+
+          const move = (moveEvent) => {
+            const dxPct = ((moveEvent.clientX - startX) / canvasRect.width) * 100;
+            const dyPct = ((moveEvent.clientY - startY) / canvasRect.height) * 100;
+
+            sticker.x = Math.min(105, Math.max(-5, originalX + dxPct));
+            sticker.y = Math.min(105, Math.max(-5, originalY + dyPct));
+
+            node.style.left = `${sticker.x}%`;
+            node.style.top = `${sticker.y}%`;
+          };
+
+          const up = () => {
+            node.removeEventListener('pointermove', move);
+            node.removeEventListener('pointerup', up);
+            node.removeEventListener('pointercancel', up);
+          };
+
+          node.addEventListener('pointermove', move);
+          node.addEventListener('pointerup', up);
+          node.addEventListener('pointercancel', up);
+        });
+
+        node.addEventListener('click', (event) => {
+          if (!event.target.closest('button')) selectSticker(instanceId);
+        });
+
+        node.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            selectSticker(instanceId);
+          }
+          if ((event.key === 'Delete' || event.key === 'Backspace') && state.activeStickerId === instanceId) {
+            event.preventDefault();
+            deleteSticker(instanceId);
+          }
+        });
+
+        const deleteButton = node.querySelector('[data-bp-delete-sticker]');
+        deleteButton?.addEventListener('click', (event) => {
+          event.stopPropagation();
+          deleteSticker(instanceId);
+        });
+
+        const resizeButton = node.querySelector('[data-bp-resize-sticker]');
+        resizeButton?.addEventListener('pointerdown', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const sticker = state.stickers.find((candidate) => candidate.instanceId === instanceId);
+          if (!sticker) return;
+
+          selectSticker(instanceId);
+          pushHistory();
+
+          const nodeRect = node.getBoundingClientRect();
+          const centerX = nodeRect.left + nodeRect.width / 2;
+          const centerY = nodeRect.top + nodeRect.height / 2;
+          const startDistance = Math.max(
+            1,
+            Math.hypot(event.clientX - centerX, event.clientY - centerY)
+          );
+          const startScale = sticker.scale;
+
+          resizeButton.setPointerCapture(event.pointerId);
+
+          const move = (moveEvent) => {
+            const distance = Math.hypot(moveEvent.clientX - centerX, moveEvent.clientY - centerY);
+            sticker.scale = Math.min(4.5, Math.max(0.22, startScale * (distance / startDistance)));
+            applyStickerTransform(node, sticker);
+          };
+
+          const up = () => {
+            resizeButton.removeEventListener('pointermove', move);
+            resizeButton.removeEventListener('pointerup', up);
+            resizeButton.removeEventListener('pointercancel', up);
+          };
+
+          resizeButton.addEventListener('pointermove', move);
+          resizeButton.addEventListener('pointerup', up);
+          resizeButton.addEventListener('pointercancel', up);
+        });
+
+        const rotateButton = node.querySelector('[data-bp-rotate-sticker]');
+        rotateButton?.addEventListener('pointerdown', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const sticker = state.stickers.find((candidate) => candidate.instanceId === instanceId);
+          if (!sticker) return;
+
+          selectSticker(instanceId);
+          pushHistory();
+
+          const nodeRect = node.getBoundingClientRect();
+          const centerX = nodeRect.left + nodeRect.width / 2;
+          const centerY = nodeRect.top + nodeRect.height / 2;
+          const startPointerAngle = Math.atan2(event.clientY - centerY, event.clientX - centerX);
+          const startRotation = sticker.rotation;
+
+          rotateButton.setPointerCapture(event.pointerId);
+
+          const move = (moveEvent) => {
+            const currentPointerAngle = Math.atan2(
+              moveEvent.clientY - centerY,
+              moveEvent.clientX - centerX
+            );
+            const delta = (currentPointerAngle - startPointerAngle) * 180 / Math.PI;
+            sticker.rotation = startRotation + delta;
+            applyStickerTransform(node, sticker);
+          };
+
+          const up = () => {
+            rotateButton.removeEventListener('pointermove', move);
+            rotateButton.removeEventListener('pointerup', up);
+            rotateButton.removeEventListener('pointercancel', up);
+          };
+
+          rotateButton.addEventListener('pointermove', move);
+          rotateButton.addEventListener('pointerup', up);
+          rotateButton.addEventListener('pointercancel', up);
+        });
+      }
+
+      function applyStickerTransform(node, sticker) {
+        node.style.transform =
+          `translate(-50%,-50%) rotate(${sticker.rotation}deg) scale(${sticker.scale})`;
+      }
+
+      function deleteSticker(instanceId) {
+        const index = state.stickers.findIndex((sticker) => sticker.instanceId === instanceId);
+        if (index < 0) return;
+
+        pushHistory();
+        state.stickers.splice(index, 1);
+        state.activeStickerId = null;
+        renderStickers();
+      }
+
+      function undo() {
+        if (!state.undoStack.length) return;
+        state.redoStack.push(cloneStickerState());
+        restoreSnapshot(state.undoStack.pop());
+      }
+
+      function redo() {
+        if (!state.redoStack.length) return;
+        state.undoStack.push(cloneStickerState());
+        restoreSnapshot(state.redoStack.pop());
+      }
+
+      function reset() {
+        if (!state.stickers.length) return;
+        clearStickers(true);
+      }
+
+      function getSavePayload() {
+        return {
+          version: 1,
+          savedAt: new Date().toISOString(),
+          character: state.selectedCharacter
+            ? {
+                id: state.selectedCharacter.id,
+                handle: state.selectedCharacter.handle,
+                name: state.selectedCharacter.name
+              }
+            : null,
+          pose: state.selectedPose
+            ? {
+                id: state.selectedPose.id,
+                handle: state.selectedPose.handle,
+                name: state.selectedPose.name
+              }
+            : null,
+          stickers: state.stickers.map((sticker) => ({
+            assetId: sticker.assetId,
+            assetHandle: sticker.assetHandle,
+            itemId: sticker.itemId,
+            itemHandle: sticker.itemHandle,
+            image: sticker.image,
+            x: Number(sticker.x.toFixed(4)),
+            y: Number(sticker.y.toFixed(4)),
+            scale: Number(sticker.scale.toFixed(4)),
+            rotation: Number(sticker.rotation.toFixed(3))
+          }))
+        };
+      }
+
+      function saveBuddy(button) {
+        const payload = getSavePayload();
+
+        /*
+          MVP save:
+          Stores design in browser localStorage.
+
+          Integration hook:
+          Listen for "bp-builder:saved" if you later want to send this payload
+          to a Shopify customer metafield, app proxy, external backend, etc.
+        */
+        try {
+          localStorage.setItem(`bp-builder-design:${sectionId}`, JSON.stringify(payload));
+        } catch (error) {
+          console.warn('[BP Builder] localStorage save failed', error);
+        }
+
+        root.dispatchEvent(
+          new CustomEvent('bp-builder:saved', {
+            bubbles: true,
+            detail: payload
+          })
+        );
+
+        const original = button.textContent;
+        button.textContent = 'Saved ✓';
+        button.disabled = true;
+        window.setTimeout(() => {
+          button.textContent = original;
+          button.disabled = false;
+        }, 1500);
+      }
+
+      function wireStaticEvents() {
+        els.continueCharacter.addEventListener('click', () => {
+          if (!state.selectedCharacter) return;
+          renderPoses();
+          showView('pose');
+        });
+
+        els.backToCharacter.addEventListener('click', () => showView('character'));
+
+        els.startDressing.addEventListener('click', () => {
+          if (!state.selectedPose) return;
+          enterBuilder();
+        });
+
+        els.backToPose.addEventListener('click', () => {
+          hideBubble();
+          renderPoses();
+          showView('pose');
+        });
+
+        els.changePose.addEventListener('click', () => {
+          hideBubble();
+          renderPoses();
+          showView('pose');
+        });
+
+        els.canvas.addEventListener('pointerdown', (event) => {
+          if (!event.target.closest('[data-bp-sticker-id]')) {
+            state.activeStickerId = null;
+            syncStickerSelectionUI();
+          }
+        });
+
+        els.undo.addEventListener('click', undo);
+        els.redo.addEventListener('click', redo);
+        els.reset.addEventListener('click', reset);
+
+        els.saveButtons.forEach((button) => {
+          button.addEventListener('click', () => saveBuddy(button));
+        });
+
+        document.addEventListener('keydown', (event) => {
+          if (!root.contains(document.activeElement) && !root.matches(':hover')) return;
+
+          const target = event.target;
+          const isTyping = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+          if (isTyping) return;
+
+          if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+            event.preventDefault();
+            event.shiftKey ? redo() : undo();
+          }
+
+          if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
+            event.preventDefault();
+            redo();
+          }
+
+          if (
+            state.activeStickerId &&
+            (event.key === 'Delete' || event.key === 'Backspace')
+          ) {
+            event.preventDefault();
+            deleteSticker(state.activeStickerId);
+          }
+        });
+      }
+
+      renderCharacters();
+      wireStaticEvents();
+      updateHistoryControls();
+
+      root.dispatchEvent(
+        new CustomEvent('bp-builder:ready', {
+          bubbles: true,
+          detail: {
+            characters: characters.length,
+            poses: poses.length,
+            items: items.length,
+            assets: assets.length
+          }
+        })
+      );
+    })();
+  </script>
+</section>
+
+{% schema %}
+{
+  "name": "BP Sticker Builder",
+  "tag": "section",
+  "class": "section-bp-sticker-builder",
+  "settings": [
+    {
+      "type": "text",
+      "id": "eyebrow",
+      "label": "Eyebrow",
+      "default": "Create your own buddy"
+    },
+    {
+      "type": "text",
+      "id": "choose_title",
+      "label": "Choose character title",
+      "default": "Choose your Buddy"
+    },
+    {
+      "type": "text",
+      "id": "choose_subtitle",
+      "label": "Choose character subtitle",
+      "default": "Pick a character to start creating."
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Accent color",
+      "default": "#8B5CF6"
+    },
+    {
+      "type": "color",
+      "id": "accent_soft_color",
+      "label": "Soft accent color",
+      "default": "#F3E8FF"
+    },
+    {
+      "type": "color",
+      "id": "surface_color",
+      "label": "Section background",
+      "default": "#FFFDFB"
+    },
+    {
+      "type": "color",
+      "id": "canvas_color",
+      "label": "Canvas area background",
+      "default": "#F7F5FB"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text color",
+      "default": "#241E30"
+    }
+  ],
+  "presets": [
+    {
+      "name": "BP Sticker Builder"
+    }
+  ]
+}
+{% endschema %}

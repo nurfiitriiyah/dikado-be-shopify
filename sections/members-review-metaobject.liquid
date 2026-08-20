@@ -1,0 +1,692 @@
+{% comment %}
+ INI FULL 
+  Members Review — Product Metaobject version
+
+  Reads a LIST of Product Reviews metaobject entries from a product metafield.
+  Default metafield: product.metafields.custom.product_reviews
+{% endcomment %}
+
+{% liquid
+  assign section_label = section.settings.heading | default: 'Review'
+  assign reviews_metafield = product.metafields[section.settings.metafield_namespace][section.settings.metafield_key]
+  assign reviews = reviews_metafield.value
+%}
+
+<section
+  id="MembersReview-{{ section.id }}"
+  class="members-review color-{{ section.settings.color_scheme }}"
+  style="
+    --mr-accent: {{ section.settings.accent_color }};
+    --mr-recommend: {{ section.settings.recommend_color }};
+    --mr-text: {{ section.settings.text_color }};
+    --mr-muted: {{ section.settings.muted_color }};
+    --mr-line: {{ section.settings.divider_color }};
+    --mr-max-width: {{ section.settings.max_width }}px;
+    --mr-padding-top: {{ section.settings.padding_top }}px;
+    --mr-padding-bottom: {{ section.settings.padding_bottom }}px;
+  "
+>
+  <div class="members-review__container">
+    <header class="members-review__header">
+
+      <h2 class="members-review__heading">{{ section.settings.heading | escape }}</h2>
+
+      {% if section.settings.subtitle != blank %}
+        <p class="members-review__subtitle">{{ section.settings.subtitle | escape }}</p>
+      {% endif %}
+    </header>
+
+    <div class="members-review__list">
+      {% if reviews != blank %}
+        {% for review_entry in reviews %}
+          {% liquid
+            assign reviewer_name = review_entry.reviewer_username.value | default: review_entry.reviewer_name.value | default: 'Member'
+            assign avatar = review_entry.reviewer_avatar.value | default: review_entry.avatar.value
+            assign skin_type = review_entry.skin_type.value
+            assign age_range = review_entry.age_range.value
+            assign rating = review_entry.rating.value | default: 5 | plus: 0
+            assign review_text = review_entry.review.value | default: review_entry.review_text.value
+            assign review_length = review_text | strip_html | size
+            assign usage_period = review_entry.usage_period.value
+            assign review_date_value = review_entry.review_date.value
+            assign recommended = true
+            if review_entry.recommended != blank
+              assign recommended = review_entry.recommended.value
+            endif
+          %}
+
+          <article class="members-review__item">
+            <aside class="members-review__profile">
+              {% if avatar != blank %}
+                {{
+                  avatar
+                  | image_url: width: 180
+                  | image_tag:
+                    class: 'members-review__avatar',
+                    widths: '90, 120, 180',
+                    loading: 'lazy',
+                    alt: reviewer_name
+                }}
+              {% else %}
+                <div class="members-review__avatar members-review__avatar--placeholder" aria-hidden="true">
+                  {{ reviewer_name | slice: 0, 1 | upcase }}
+                </div>
+              {% endif %}
+
+              <div class="members-review__name">{{ reviewer_name | escape }}</div>
+
+              {% if skin_type != blank %}
+                <div class="members-review__meta">{{ skin_type | escape }}</div>
+              {% endif %}
+
+              {% if age_range != blank %}
+                <div class="members-review__meta">{{ age_range | escape }}</div>
+              {% endif %}
+            </aside>
+
+            <div class="members-review__content">
+              <div class="members-review__topline">
+                <div
+                  class="members-review__stars"
+                  role="img"
+                  aria-label="{{ rating }} dari 5 bintang"
+                >
+                  {% for index in (1..5) %}
+                    <span class="members-review__star{% if index > rating %} members-review__star--empty{% endif %}">★</span>
+                  {% endfor %}
+                </div>
+
+                {% if review_date_value != blank %}
+                  <time
+                    class="members-review__date"
+                    datetime="{{ review_date_value | date: '%Y-%m-%d' }}"
+                  >
+                    {{ review_date_value | date: section.settings.date_format }}
+                  </time>
+                {% endif %}
+              </div>
+
+              {% if recommended %}
+                <div class="members-review__recommended">
+                  <span class="members-review__recommend-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
+                      <path d="M7.5 10.2v9H4.7a1.7 1.7 0 0 1-1.7-1.7v-5.6a1.7 1.7 0 0 1 1.7-1.7h2.8Zm2 9V10l3.4-5.2c.6-.9 2-.5 2 .6v3.3h3.5c1.5 0 2.6 1.4 2.2 2.8l-1.7 5.9c-.3 1.1-1.3 1.8-2.4 1.8h-7Z" fill="currentColor"/>
+                    </svg>
+                  </span>
+                  <span>{{ section.settings.recommend_label | escape }}</span>
+                </div>
+              {% endif %}
+
+              {% if review_text != blank %}
+                <div class="members-review__review-wrap" data-review-wrap>
+                  <div class="members-review__text rte" data-review-text>
+                    {{ review_text | newline_to_br }}
+                  </div>
+
+                  {% if review_length > section.settings.read_more_threshold %}
+                    <button
+                      class="members-review__read-more"
+                      type="button"
+                      data-review-toggle
+                      aria-expanded="false"
+                    >
+                      {{ section.settings.read_more_label | escape }}
+                    </button>
+                  {% endif %}
+                </div>
+              {% endif %}
+
+              {% if usage_period != blank %}
+                <div class="members-review__usage">
+                  <svg class="members-review__clock" viewBox="0 0 24 24" width="25" height="25" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                    <path d="M12 7v5l3.2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <span>{{ section.settings.usage_label | escape }} :</span>
+                  <strong>{{ usage_period | escape }}</strong>
+                </div>
+              {% endif %}
+            </div>
+          </article>
+        {% endfor %}
+      {% elsif request.design_mode %}
+        <div class="members-review__empty">
+          Belum ada review yang dipilih untuk produk ini. Buka Products → pilih produk → Product Reviews.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{% stylesheet %}
+  .members-review {
+    background: rgb(var(--color-background));
+    color: var(--mr-text);
+    padding-block: var(--mr-padding-top) var(--mr-padding-bottom);
+  }
+
+  .members-review__container {
+    width: min(100% - 40px, var(--mr-max-width));
+    margin-inline: auto;
+  }
+
+  .members-review__header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 48px;
+  }
+
+  .members-review__logo-wrap {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+  }
+
+  .members-review__logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .members-review__stamp {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    border: 3px solid var(--mr-accent);
+    border-radius: 50%;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    color: var(--mr-accent);
+    line-height: 1;
+    transform: rotate(-5deg);
+  }
+
+  .members-review__stamp span {
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: .08em;
+  }
+
+  .members-review__stamp strong {
+    display: block;
+    font-size: 22px;
+    margin: 2px 0;
+  }
+
+  .members-review__heading {
+    margin: 0;
+    font-size: clamp(25px, 2.2vw, 36px);
+    line-height: 1.1;
+    font-weight: 750;
+    letter-spacing: -.03em;
+    color: var(--mr-text);
+  }
+
+  .members-review__subtitle {
+    margin: 1px 0 0;
+    font-size: clamp(17px, 1.5vw, 23px);
+    font-style: italic;
+    color: var(--mr-muted);
+  }
+
+  .members-review__item {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    column-gap: 40px;
+    padding: 24px 0 64px;
+    border-bottom: 1px solid var(--mr-line);
+  }
+
+  .members-review__item + .members-review__item {
+    padding-top: 64px;
+  }
+
+  .members-review__profile {
+    min-width: 0;
+  }
+
+  .members-review__avatar {
+    display: block;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 22px;
+  }
+
+  .members-review__avatar--placeholder {
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--mr-accent) 14%, white);
+    color: var(--mr-accent);
+    font-size: 32px;
+    font-weight: 800;
+  }
+
+  .members-review__name {
+    font-size: 22px;
+    line-height: 1.2;
+    font-weight: 750;
+    color: var(--mr-text);
+    overflow-wrap: anywhere;
+  }
+
+  .members-review__meta {
+    margin-top: 10px;
+    font-size: 18px;
+    line-height: 1.3;
+    color: var(--mr-muted);
+  }
+
+  .members-review__topline {
+    min-height: 45px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+  }
+
+  .members-review__stars {
+    display: flex;
+    gap: 3px;
+    color: var(--mr-accent);
+    font-size: 34px;
+    line-height: 1;
+    letter-spacing: -2px;
+  }
+
+  .members-review__star--empty {
+    color: color-mix(in srgb, var(--mr-muted) 25%, transparent);
+  }
+
+  .members-review__date {
+    flex: 0 0 auto;
+    padding-top: 2px;
+    font-size: 19px;
+    color: var(--mr-muted);
+    white-space: nowrap;
+  }
+
+  .members-review__recommended {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 7px;
+    font-size: 20px;
+    line-height: 1.2;
+    font-weight: 700;
+    color: var(--mr-text);
+  }
+
+  .members-review__recommend-icon {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    background: var(--mr-recommend);
+  }
+
+  .members-review__review-wrap {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    column-gap: 6px;
+    margin-top: 20px;
+  }
+
+  .members-review__text {
+    flex: 1 1 640px;
+    min-width: 0;
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.36;
+    color: var(--mr-text);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .members-review__text p,
+  .members-review__text br {
+    margin: 0;
+  }
+
+  .members-review__review-wrap.is-expanded .members-review__text {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+
+  .members-review__read-more {
+    appearance: none;
+    border: 0;
+    padding: 0;
+    margin: 0 0 2px;
+    background: transparent;
+    color: #008d85;
+    font: inherit;
+    font-size: 20px;
+    line-height: 1.36;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .members-review__read-more:hover,
+  .members-review__read-more:focus-visible {
+    text-decoration: underline;
+  }
+
+  .members-review__usage {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 28px;
+    font-size: 19px;
+    line-height: 1.3;
+    color: var(--mr-text);
+  }
+
+  .members-review__usage strong {
+    color: #111;
+    font-weight: 750;
+  }
+
+  .members-review__clock {
+    flex: 0 0 25px;
+    color: var(--mr-text);
+    margin-right: 4px;
+  }
+
+  .members-review__empty {
+    padding: 40px 0;
+    text-align: center;
+    color: var(--mr-muted);
+  }
+
+  @media screen and (max-width: 749px) {
+    .members-review__container {
+      width: min(100% - 28px, var(--mr-max-width));
+    }
+
+    .members-review__header {
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 12px 14px;
+      margin-bottom: 30px;
+    }
+
+    .members-review__logo-wrap,
+    .members-review__stamp {
+      width: 52px;
+      height: 52px;
+      flex-basis: 52px;
+    }
+
+    .members-review__heading {
+      align-self: center;
+      max-width: calc(100% - 68px);
+    }
+
+    .members-review__subtitle {
+      flex-basis: 100%;
+      padding-left: 66px;
+      margin-top: -13px;
+    }
+
+    .members-review__item,
+    .members-review__item + .members-review__item {
+      grid-template-columns: 1fr;
+      gap: 22px;
+      padding: 28px 0 38px;
+    }
+
+    .members-review__profile {
+      display: grid;
+      grid-template-columns: 70px 1fr;
+      grid-template-rows: auto auto auto;
+      column-gap: 14px;
+      align-items: center;
+    }
+
+    .members-review__avatar {
+      width: 70px;
+      height: 70px;
+      grid-row: 1 / 4;
+      margin: 0;
+    }
+
+    .members-review__name {
+      font-size: 18px;
+    }
+
+    .members-review__meta {
+      margin-top: 3px;
+      font-size: 15px;
+    }
+
+    .members-review__topline {
+      min-height: 0;
+      align-items: center;
+    }
+
+    .members-review__stars {
+      font-size: 27px;
+    }
+
+    .members-review__date {
+      font-size: 15px;
+    }
+
+    .members-review__recommended {
+      margin-top: 12px;
+      font-size: 17px;
+    }
+
+    .members-review__recommend-icon {
+      width: 28px;
+      height: 28px;
+      flex-basis: 28px;
+    }
+
+    .members-review__review-wrap {
+      margin-top: 16px;
+    }
+
+    .members-review__text,
+    .members-review__read-more {
+      font-size: 17px;
+    }
+
+    .members-review__usage {
+      margin-top: 22px;
+      font-size: 16px;
+    }
+  }
+{% endstylesheet %}
+
+<script>
+  (() => {
+    const section = document.getElementById('MembersReview-{{ section.id }}');
+    if (!section || section.dataset.reviewReady === 'true') return;
+
+    section.dataset.reviewReady = 'true';
+    section.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-review-toggle]');
+      if (!button) return;
+
+      const wrapper = button.closest('[data-review-wrap]');
+      const expanded = wrapper.classList.toggle('is-expanded');
+
+      button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      button.textContent = expanded
+        ? {{ section.settings.read_less_label | json }}
+        : {{ section.settings.read_more_label | json }};
+    });
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Review",
+  "tag": "section",
+  "class": "section-members-review",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Review"
+    },
+    {
+      "type": "image_picker",
+      "id": "logo",
+      "label": "Logo kecil"
+    },
+    {
+      "type": "header",
+      "content": "Sumber data"
+    },
+    {
+      "type": "text",
+      "id": "metafield_namespace",
+      "label": "Metafield namespace",
+      "default": "custom"
+    },
+    {
+      "type": "text",
+      "id": "metafield_key",
+      "label": "Metafield key",
+      "default": "product_reviews"
+    },
+    {
+      "type": "text",
+      "id": "usage_label",
+      "label": "Label usage period",
+      "default": "Usage Period"
+    },
+    {
+      "type": "text",
+      "id": "recommend_label",
+      "label": "Teks rekomendasi",
+      "default": "Recommends this product!"
+    },
+    {
+      "type": "text",
+      "id": "date_format",
+      "label": "Format tanggal",
+      "default": "%d %b %Y",
+      "info": "Contoh: %d %b %Y menjadi 28 Jul 2026"
+    },
+    {
+      "type": "text",
+      "id": "read_more_label",
+      "label": "Teks read more",
+      "default": "read more"
+    },
+    {
+      "type": "text",
+      "id": "read_less_label",
+      "label": "Teks read less",
+      "default": "read less"
+    },
+    {
+      "type": "range",
+      "id": "read_more_threshold",
+      "label": "Minimal karakter untuk read more",
+      "min": 50,
+      "max": 400,
+      "step": 10,
+      "default": 120
+    },
+    {
+      "type": "header",
+      "content": "Warna"
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "Color scheme",
+      "default": "scheme-1"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Warna bintang dan stamp",
+      "default": "#7D59D9"
+    },
+    {
+      "type": "color",
+      "id": "recommend_color",
+      "label": "Warna ikon rekomendasi",
+      "default": "#4CC878"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Warna teks",
+      "default": "#3F4A59"
+    },
+    {
+      "type": "color",
+      "id": "muted_color",
+      "label": "Warna teks sekunder",
+      "default": "#8392A7"
+    },
+    {
+      "type": "color",
+      "id": "divider_color",
+      "label": "Warna garis",
+      "default": "#D9E0E8"
+    },
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "range",
+      "id": "max_width",
+      "label": "Lebar maksimum",
+      "min": 900,
+      "max": 1600,
+      "step": 20,
+      "unit": "px",
+      "default": 1440
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "Padding atas",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 36
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "Padding bawah",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 36
+    }
+  ],
+  "presets": [
+    {
+      "name": "Members Review"
+    }
+  ]
+}
+{% endschema %}

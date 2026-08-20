@@ -1,0 +1,755 @@
+{% comment %}
+  Combined product section:
+  - Review on the left
+  - Shopify Product Recommendations on the right
+
+  Requires snippet: snippets/members-review-column.liquid
+{% endcomment %}
+
+{% liquid
+  assign reviews_metafield = product.metafields[section.settings.metafield_namespace][section.settings.metafield_key]
+  assign reviews = reviews_metafield.value
+
+  case section.settings.desktop_ratio
+    when '60_40'
+      assign desktop_columns = 'minmax(0, 3fr) minmax(280px, 2fr)'
+    when '70_30'
+      assign desktop_columns = 'minmax(0, 7fr) minmax(280px, 3fr)'
+    else
+      assign desktop_columns = 'minmax(0, 2fr) minmax(280px, 1fr)'
+  endcase
+%}
+
+<section
+  id="ReviewRecommendations-{{ section.id }}"
+  class="review-recommendations color-{{ section.settings.color_scheme }}"
+  style="
+    --rr-columns: {{ desktop_columns }};
+    --rr-max-width: {{ section.settings.max_width }}px;
+    --rr-column-gap: {{ section.settings.column_gap }}px;
+    --rr-padding-top: {{ section.settings.padding_top }}px;
+    --rr-padding-bottom: {{ section.settings.padding_bottom }}px;
+    --rr-accent: {{ section.settings.accent_color }};
+    --rr-recommend: {{ section.settings.recommend_color }};
+    --rr-text: {{ section.settings.text_color }};
+    --rr-muted: {{ section.settings.muted_color }};
+    --rr-line: {{ section.settings.divider_color }};
+  "
+>
+  <div class="review-recommendations__container">
+    <div class="review-recommendations__grid">
+      <div class="review-recommendations__left" aria-labelledby="ReviewHeading-{{ section.id }}">
+        {% render 'members-review-column',
+          reviews: reviews,
+          review_settings: section.settings,
+          review_section_id: section.id
+        %}
+      </div>
+
+      <aside class="review-recommendations__right">
+        <div
+          class="rr-product-recommendations{% if section.settings.sticky_recommendations %} rr-product-recommendations--sticky{% endif %}"
+          data-product-recommendations
+          data-url="{{ routes.product_recommendations_url }}?section_id={{ section.id }}&product_id={{ product.id }}&limit={{ section.settings.products_limit }}&intent=related"
+        >
+          {% if recommendations.performed? %}
+            <h2 class="rr-products-heading">{{ section.settings.products_heading | escape }}</h2>
+
+            {% if recommendations.products_count > 0 %}
+              <div class="rr-products-grid">
+                {% for recommended_product in recommendations.products %}
+                  <article class="rr-product-card">
+                    <a class="rr-product-card__link" href="{{ recommended_product.url }}">
+                      <div class="rr-product-card__media">
+                        {% if recommended_product.featured_image != blank %}
+                          {% assign product_image_alt = recommended_product.featured_image.alt | default: recommended_product.title %}
+                          {{
+                            recommended_product.featured_image
+                            | image_url: width: 720
+                            | image_tag:
+                              class: 'rr-product-card__image',
+                              widths: '240, 360, 480, 720',
+                              sizes: '(max-width: 989px) 50vw, 360px',
+                              loading: 'lazy',
+                              alt: product_image_alt
+                          }}
+                        {% else %}
+                          <div class="rr-product-card__placeholder" aria-hidden="true">
+                            {{ 'product-1' | placeholder_svg_tag: 'rr-product-card__placeholder-svg' }}
+                          </div>
+                        {% endif %}
+                      </div>
+
+                      <div class="rr-product-card__content">
+                        <h3 class="rr-product-card__title">{{ recommended_product.title | escape }}</h3>
+                        <p class="rr-product-card__price">{{ recommended_product.price | money }}</p>
+                      </div>
+                    </a>
+                  </article>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="rr-products-empty">Belum ada rekomendasi produk untuk produk ini.</p>
+            {% endif %}
+          {% else %}
+            <h2 class="rr-products-heading">{{ section.settings.products_heading | escape }}</h2>
+            <div class="rr-products-loading" aria-hidden="true">
+              <span class="rr-products-loading__media"></span>
+              <span class="rr-products-loading__line"></span>
+              <span class="rr-products-loading__line rr-products-loading__line--short"></span>
+            </div>
+          {% endif %}
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+{% stylesheet %}
+  .review-recommendations {
+    background: rgb(var(--color-background));
+    color: var(--rr-text);
+    padding-block: var(--rr-padding-top) var(--rr-padding-bottom);
+  }
+
+  .review-recommendations__container {
+    width: min(100% - 40px, var(--rr-max-width));
+    margin-inline: auto;
+  }
+
+  .review-recommendations__grid {
+    display: grid;
+    grid-template-columns: var(--rr-columns);
+    gap: var(--rr-column-gap);
+    align-items: start;
+  }
+
+  .review-recommendations__left,
+  .review-recommendations__right {
+    min-width: 0;
+  }
+
+  .rr-heading {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 34px;
+  }
+
+  .rr-heading__logo {
+    width: 56px;
+    height: 56px;
+    flex: 0 0 56px;
+    object-fit: contain;
+  }
+
+  .rr-heading__title,
+  .rr-products-heading {
+    margin: 0;
+    color: var(--rr-text);
+    font-size: clamp(25px, 2.2vw, 36px);
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    font-weight: 750;
+  }
+
+  .rr-heading__subtitle {
+    margin: 5px 0 0;
+    color: var(--rr-muted);
+    font-size: 16px;
+    line-height: 1.35;
+  }
+
+  .rr-review-list {
+    border-top: 1px solid var(--rr-line);
+  }
+
+  .rr-review-item {
+    display: grid;
+    grid-template-columns: 124px minmax(0, 1fr);
+    gap: 28px;
+    padding: 34px 0 42px;
+    border-bottom: 1px solid var(--rr-line);
+  }
+
+  .rr-review-profile {
+    min-width: 0;
+  }
+
+  .rr-review-avatar {
+    display: block;
+    width: 88px;
+    height: 88px;
+    margin-bottom: 18px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .rr-review-avatar--placeholder {
+    display: grid;
+    place-items: center;
+    background: #fde7ed;
+    color: var(--rr-accent);
+    font-size: 28px;
+    font-weight: 800;
+  }
+
+  .rr-review-name {
+    margin: 0;
+    color: var(--rr-text);
+    font-size: 18px;
+    line-height: 1.2;
+    font-weight: 750;
+    overflow-wrap: anywhere;
+  }
+
+  .rr-review-meta {
+    margin: 7px 0 0;
+    color: var(--rr-muted);
+    font-size: 15px;
+    line-height: 1.3;
+  }
+
+  .rr-review-topline {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+  }
+
+  .rr-stars {
+    display: flex;
+    gap: 2px;
+    color: var(--rr-accent);
+    font-size: 29px;
+    line-height: 1;
+    letter-spacing: -2px;
+  }
+
+  .rr-star--empty {
+    color: #dce3eb;
+  }
+
+  .rr-review-date {
+    flex: 0 0 auto;
+    color: var(--rr-muted);
+    font-size: 15px;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+
+  .rr-recommended {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    color: var(--rr-text);
+    font-size: 16px;
+    line-height: 1.3;
+    font-weight: 700;
+  }
+
+  .rr-recommended__icon {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--rr-recommend);
+    color: #fff;
+  }
+
+  .rr-review-copy {
+    margin-top: 18px;
+  }
+
+  .rr-review-text {
+    color: var(--rr-text);
+    font-size: 17px;
+    line-height: 1.5;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .rr-review-copy.is-expanded .rr-review-text {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+
+  .rr-read-more {
+    appearance: none;
+    border: 0;
+    padding: 0;
+    margin-top: 5px;
+    background: transparent;
+    color: #008d85;
+    font: inherit;
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  .rr-read-more:hover,
+  .rr-read-more:focus-visible {
+    text-decoration: underline;
+  }
+
+  .rr-usage-period {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 22px;
+    color: var(--rr-text);
+    font-size: 15px;
+    line-height: 1.35;
+  }
+
+  .rr-usage-period strong {
+    font-weight: 750;
+  }
+
+  .rr-empty-state,
+  .rr-products-empty {
+    padding: 28px 0;
+    color: var(--rr-muted);
+  }
+
+  .rr-product-recommendations--sticky {
+    position: sticky;
+    top: 110px;
+  }
+
+  .rr-products-heading {
+    margin-bottom: 34px;
+  }
+
+  .rr-products-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .rr-product-card {
+    min-width: 0;
+  }
+
+  .rr-product-card__link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .rr-product-card__media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: 4px;
+    background: #f2f2f2;
+  }
+
+  .rr-product-card__image,
+  .rr-product-card__placeholder,
+  .rr-product-card__placeholder-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .rr-product-card__image {
+    object-fit: cover;
+    transition: transform 0.25s ease;
+  }
+
+  .rr-product-card__link:hover .rr-product-card__image {
+    transform: scale(1.025);
+  }
+
+  .rr-product-card__placeholder-svg {
+    color: #b9b9b9;
+  }
+
+  .rr-product-card__content {
+    padding-top: 14px;
+  }
+
+  .rr-product-card__title {
+    margin: 0;
+    color: var(--rr-text);
+    font-size: 17px;
+    line-height: 1.35;
+    font-weight: 650;
+  }
+
+  .rr-product-card__price {
+    margin: 7px 0 0;
+    color: var(--rr-text);
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .rr-products-loading {
+    display: grid;
+    gap: 12px;
+  }
+
+  .rr-products-loading__media,
+  .rr-products-loading__line {
+    display: block;
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+
+  .rr-products-loading__media {
+    aspect-ratio: 1;
+  }
+
+  .rr-products-loading__line {
+    width: 75%;
+    height: 15px;
+  }
+
+  .rr-products-loading__line--short {
+    width: 38%;
+  }
+
+  @media screen and (max-width: 989px) {
+    .review-recommendations__grid {
+      grid-template-columns: 1fr;
+      gap: 64px;
+    }
+
+    .rr-product-recommendations--sticky {
+      position: static;
+    }
+
+    .rr-products-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media screen and (max-width: 749px) {
+    .review-recommendations__container {
+      width: min(100% - 28px, var(--rr-max-width));
+    }
+
+    .rr-heading,
+    .rr-products-heading {
+      margin-bottom: 24px;
+    }
+
+    .rr-heading__logo {
+      width: 48px;
+      height: 48px;
+      flex-basis: 48px;
+    }
+
+    .rr-review-item {
+      grid-template-columns: 1fr;
+      gap: 22px;
+      padding: 28px 0 34px;
+    }
+
+    .rr-review-profile {
+      display: grid;
+      grid-template-columns: 64px minmax(0, 1fr);
+      gap: 14px;
+      align-items: center;
+    }
+
+    .rr-review-avatar {
+      width: 64px;
+      height: 64px;
+      margin: 0;
+    }
+
+    .rr-review-topline {
+      align-items: center;
+    }
+
+    .rr-stars {
+      font-size: 25px;
+    }
+
+    .rr-products-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+{% endstylesheet %}
+
+<script>
+  (() => {
+    const root = document.getElementById('ReviewRecommendations-{{ section.id }}');
+    if (!root || root.dataset.ready === 'true') return;
+
+    root.dataset.ready = 'true';
+
+    root.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-review-toggle]');
+      if (!button) return;
+
+      const wrapper = button.closest('[data-review-wrap]');
+      if (!wrapper) return;
+
+      const expanded = wrapper.classList.toggle('is-expanded');
+      button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      button.textContent = expanded
+        ? {{ section.settings.read_less_label | json }}
+        : {{ section.settings.read_more_label | json }};
+    });
+
+    const recommendationsRoot = root.querySelector('[data-product-recommendations]');
+    if (!recommendationsRoot || recommendationsRoot.dataset.loaded === 'true') return;
+
+    const loadRecommendations = () => {
+      recommendationsRoot.dataset.loaded = 'true';
+
+      fetch(recommendationsRoot.dataset.url)
+        .then((response) => {
+          if (!response.ok) throw new Error(`Product recommendations failed: ${response.status}`);
+          return response.text();
+        })
+        .then((text) => {
+          const html = document.createElement('div');
+          html.innerHTML = text;
+
+          const nextRecommendations = html.querySelector('[data-product-recommendations]');
+          if (nextRecommendations) {
+            recommendationsRoot.innerHTML = nextRecommendations.innerHTML;
+          }
+        })
+        .catch((error) => {
+          console.error(error);
+          recommendationsRoot.innerHTML = '<h2 class="rr-products-heading">{{ section.settings.products_heading | escape }}</h2><p class="rr-products-empty">Rekomendasi produk belum dapat dimuat.</p>';
+        });
+    };
+
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (!entries[0].isIntersecting) return;
+          observer.disconnect();
+          loadRecommendations();
+        },
+        { rootMargin: '0px 0px 250px 0px' }
+      );
+
+      observer.observe(recommendationsRoot);
+    } else {
+      loadRecommendations();
+    }
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Review + Recommendations",
+  "tag": "section",
+  "class": "section-review-recommendations",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": [
+    {
+      "type": "header",
+      "content": "Review"
+    },
+    {
+      "type": "text",
+      "id": "review_heading",
+      "label": "Judul review",
+      "default": "Review"
+    },
+    {
+      "type": "image_picker",
+      "id": "review_logo",
+      "label": "Logo review"
+    },
+    {
+      "type": "text",
+      "id": "metafield_namespace",
+      "label": "Metafield namespace",
+      "default": "custom"
+    },
+    {
+      "type": "text",
+      "id": "metafield_key",
+      "label": "Metafield key",
+      "default": "product_reviews"
+    },
+    {
+      "type": "text",
+      "id": "recommend_label",
+      "label": "Teks rekomendasi",
+      "default": "Recommends this product!"
+    },
+    {
+      "type": "text",
+      "id": "usage_label",
+      "label": "Label usage period",
+      "default": "Usage Period"
+    },
+    {
+      "type": "text",
+      "id": "date_format",
+      "label": "Format tanggal",
+      "default": "%d %b %Y"
+    },
+    {
+      "type": "text",
+      "id": "read_more_label",
+      "label": "Teks read more",
+      "default": "read more"
+    },
+    {
+      "type": "text",
+      "id": "read_less_label",
+      "label": "Teks read less",
+      "default": "read less"
+    },
+    {
+      "type": "range",
+      "id": "read_more_threshold",
+      "label": "Minimal karakter untuk read more",
+      "min": 50,
+      "max": 400,
+      "step": 10,
+      "default": 120
+    },
+    {
+      "type": "header",
+      "content": "Product Recommendations"
+    },
+    {
+      "type": "text",
+      "id": "products_heading",
+      "label": "Judul rekomendasi",
+      "default": "You may also like"
+    },
+    {
+      "type": "range",
+      "id": "products_limit",
+      "label": "Jumlah produk",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "default": 1
+    },
+    {
+      "type": "checkbox",
+      "id": "sticky_recommendations",
+      "label": "Produk tetap terlihat saat scroll",
+      "default": false
+    },
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "select",
+      "id": "desktop_ratio",
+      "label": "Lebar kolom desktop",
+      "options": [
+        {
+          "value": "60_40",
+          "label": "Review 60% / Produk 40%"
+        },
+        {
+          "value": "66_34",
+          "label": "Review 66% / Produk 34%"
+        },
+        {
+          "value": "70_30",
+          "label": "Review 70% / Produk 30%"
+        }
+      ],
+      "default": "66_34"
+    },
+    {
+      "type": "range",
+      "id": "column_gap",
+      "label": "Jarak antarkolom",
+      "min": 20,
+      "max": 100,
+      "step": 4,
+      "unit": "px",
+      "default": 56
+    },
+    {
+      "type": "range",
+      "id": "max_width",
+      "label": "Lebar maksimum",
+      "min": 900,
+      "max": 1600,
+      "step": 20,
+      "unit": "px",
+      "default": 1440
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "Color scheme",
+      "default": "scheme-1"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Warna bintang",
+      "default": "#E72B55"
+    },
+    {
+      "type": "color",
+      "id": "recommend_color",
+      "label": "Warna ikon rekomendasi",
+      "default": "#4CC878"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Warna teks",
+      "default": "#3F4A59"
+    },
+    {
+      "type": "color",
+      "id": "muted_color",
+      "label": "Warna teks sekunder",
+      "default": "#8392A7"
+    },
+    {
+      "type": "color",
+      "id": "divider_color",
+      "label": "Warna garis",
+      "default": "#D9E0E8"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "Padding atas",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 44
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "Padding bawah",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 60
+    }
+  ],
+  "presets": [
+    {
+      "name": "Review + Recommendations"
+    }
+  ]
+}
+{% endschema %}

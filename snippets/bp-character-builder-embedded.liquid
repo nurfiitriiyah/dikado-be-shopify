@@ -1,0 +1,242 @@
+{% comment %}
+  Embedded BP Character Builder used by the Custom Product Designer.
+  Uses the existing character / character_pose / character_item / character_item_asset metaobjects.
+  This builder returns ONE flattened transparent PNG to the product customizer.
+{% endcomment %}
+
+<div class="bp-builder-embedded-overlay" data-bp-builder-overlay hidden>
+  <button type="button" class="bp-builder-embedded-close" data-bp-cancel aria-label="Close character builder">×</button>
+<section
+  id="bp-builder-embedded-{{ section.id }}" data-bp-builder-root data-bp-embedded="true"
+  class="bp-builder-section"
+  style="
+    --bp-accent: #8B5CF6;
+    --bp-accent-soft: #F3E8FF;
+    --bp-surface: #FFFDFB;
+    --bp-canvas: #F7F5FB;
+    --bp-text: #241E30;
+  "
+>
+  <div class="bp-builder-shell">
+    <!-- STEP 1: CHARACTER -->
+    <div class="bp-builder-view is-active" data-bp-view="character">
+      <div class="bp-builder-intro">
+        <p class="bp-builder-eyebrow">Create your own buddy</p>
+        <h2 class="bp-builder-title">Choose your Buddy</h2>
+        <p class="bp-builder-subtitle">Pick a character to start creating.</p>
+      </div>
+
+      <div class="bp-builder-character-grid" data-bp-character-grid></div>
+
+      <div class="bp-builder-step-actions">
+        <button
+          class="bp-builder-primary-btn"
+          type="button"
+          data-bp-continue-character
+          disabled
+        >
+          Choose a Buddy first
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 2: POSE -->
+    <div class="bp-builder-view" data-bp-view="pose" hidden>
+      <div class="bp-builder-topbar">
+        <button class="bp-builder-back-btn" type="button" data-bp-back-to-character>
+          <span aria-hidden="true">←</span>
+          Back
+        </button>
+        <div class="bp-builder-topbar-copy">
+          <p class="bp-builder-eyebrow">Step 2</p>
+          <h2 class="bp-builder-title bp-builder-title--compact" data-bp-pose-title>Choose a Pose</h2>
+        </div>
+        <span class="bp-builder-topbar-spacer" aria-hidden="true"></span>
+      </div>
+
+      <p class="bp-builder-subtitle bp-builder-subtitle--center">
+        Pick the pose you want to dress up.
+      </p>
+
+      <div class="bp-builder-pose-grid" data-bp-pose-grid></div>
+
+      <div class="bp-builder-step-actions">
+        <button
+          class="bp-builder-primary-btn"
+          type="button"
+          data-bp-start-dressing
+          disabled
+        >
+          Choose a Pose first
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 3: CUSTOMIZE -->
+    <div class="bp-builder-view" data-bp-view="builder" hidden>
+      <div class="bp-builder-topbar bp-builder-topbar--builder">
+        <button class="bp-builder-back-btn" type="button" data-bp-back-to-pose>
+          <span aria-hidden="true">←</span>
+          Back
+        </button>
+
+        <div class="bp-builder-topbar-copy">
+          <p class="bp-builder-eyebrow">Dress-up mode</p>
+          <h2 class="bp-builder-title bp-builder-title--compact" data-bp-builder-title>
+            Customize your Buddy
+          </h2>
+        </div>
+
+        <button class="bp-builder-save-btn" type="button" data-bp-save>
+          Use Character
+        </button>
+      </div>
+
+      <div class="bp-builder-pose-summary">
+        <div class="bp-builder-pose-summary-copy">
+          <span class="bp-builder-pose-summary-label">Current pose</span>
+          <strong data-bp-current-pose>—</strong>
+        </div>
+        <button class="bp-builder-link-btn" type="button" data-bp-change-pose>
+          Change pose
+        </button>
+      </div>
+
+      <div class="bp-builder-workspace">
+        <!-- LEFT: CATEGORY -->
+        <aside class="bp-builder-category-panel" aria-label="Sticker categories">
+          <p class="bp-builder-panel-label">Categories</p>
+          <div class="bp-builder-category-list" data-bp-category-list></div>
+        </aside>
+
+        <!-- CENTER: ITEM LIBRARY -->
+        <section class="bp-builder-library-panel">
+          <div class="bp-builder-panel-heading">
+            <div>
+              <p class="bp-builder-panel-label">Sticker library</p>
+              <h3 class="bp-builder-panel-title" data-bp-library-title>Outfit</h3>
+            </div>
+            <span class="bp-builder-item-count" data-bp-item-count>0 items</span>
+          </div>
+
+          <div class="bp-builder-item-grid" data-bp-item-grid></div>
+
+          <div class="bp-builder-empty-state" data-bp-empty-state hidden>
+            <span class="bp-builder-empty-emoji" aria-hidden="true">✨</span>
+            <p data-bp-empty-copy>No items for this pose yet ✨</p>
+          </div>
+        </section>
+
+        <!-- RIGHT: CANVAS -->
+        <section class="bp-builder-canvas-panel">
+          <div class="bp-builder-canvas-toolbar">
+            <span class="bp-builder-canvas-hint">Tap an item, then drag it around.</span>
+
+            <div class="bp-builder-toolbar-actions">
+              <button type="button" class="bp-builder-tool-btn" data-bp-undo disabled title="Undo">
+                ↶ <span>Undo</span>
+              </button>
+              <button type="button" class="bp-builder-tool-btn" data-bp-redo disabled title="Redo">
+                ↷ <span>Redo</span>
+              </button>
+              <button type="button" class="bp-builder-tool-btn" data-bp-reset title="Reset">
+                ↺ <span>Reset</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="bp-builder-canvas-wrap">
+            <div class="bp-builder-canvas" data-bp-canvas>
+              <div class="bp-builder-speech-bubble" data-bp-bubble hidden>
+                Hi! Dress me up!
+              </div>
+
+              <img
+                class="bp-builder-base-character"
+                data-bp-base-character
+                src=""
+                alt=""
+                draggable="false"
+              >
+
+              <div class="bp-builder-sticker-layer" data-bp-sticker-layer></div>
+            </div>
+          </div>
+
+          <p class="bp-builder-mobile-help">
+            Drag stickers to move them. Use the corner handle to resize and the round handle to rotate.
+          </p>
+        </section>
+      </div>
+
+      <div class="bp-builder-mobile-save-wrap">
+        <button class="bp-builder-primary-btn bp-builder-primary-btn--full" type="button" data-bp-mobile-save>
+          Use Character
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHOPIFY METAOBJECT DATA -->
+  <script type="application/json" data-bp-characters>
+    [
+      {% assign bp_characters = shop.metaobjects.character.values %}
+      {% for character in bp_characters %}
+        {
+          "id": {{ character.system.id | json }},
+          "handle": {{ character.system.handle | json }},
+          "name": {{ character.name.value | default: character.system.handle | json }},
+          "thumbnail": {% if character.thumbnail.value %}{{ character.thumbnail.value | image_url: width: 700 | json }}{% else %}null{% endif %}
+        }{% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    ]
+  </script>
+
+  <script type="application/json" data-bp-poses>
+    [
+      {% assign bp_poses = shop.metaobjects.character_pose.values %}
+      {% for pose in bp_poses %}
+        {
+          "id": {{ pose.system.id | json }},
+          "handle": {{ pose.system.handle | json }},
+          "name": {{ pose.name.value | default: pose.system.handle | json }},
+          "characterHandle": {% if pose.character.value %}{{ pose.character.value.system.handle | json }}{% else %}null{% endif %},
+          "baseImage": {% if pose.base_image.value %}{{ pose.base_image.value | image_url: width: 1400 | json }}{% else %}null{% endif %},
+          "thumbnail": {% if pose.thumbnail.value %}{{ pose.thumbnail.value | image_url: width: 700 | json }}{% elsif pose.base_image.value %}{{ pose.base_image.value | image_url: width: 700 | json }}{% else %}null{% endif %}
+        }{% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    ]
+  </script>
+
+  <script type="application/json" data-bp-items>
+    [
+      {% assign bp_items = shop.metaobjects.character_item.values %}
+      {% for item in bp_items %}
+        {
+          "id": {{ item.system.id | json }},
+          "handle": {{ item.system.handle | json }},
+          "name": {{ item.name.value | default: item.system.handle | json }},
+          "category": {{ item.category.value | default: 'Extras' | json }},
+          "thumbnail": {% if item.thumbnail.value %}{{ item.thumbnail.value | image_url: width: 700 | json }}{% else %}null{% endif %}
+        }{% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    ]
+  </script>
+
+  <script type="application/json" data-bp-assets>
+    [
+      {% assign bp_assets = shop.metaobjects.character_item_asset.values %}
+      {% for asset in bp_assets %}
+        {
+          "id": {{ asset.system.id | json }},
+          "handle": {{ asset.system.handle | json }},
+          "itemHandle": {% if asset.item.value %}{{ asset.item.value.system.handle | json }}{% else %}null{% endif %},
+          "poseHandle": {% if asset.pose.value %}{{ asset.pose.value.system.handle | json }}{% else %}null{% endif %},
+          "image": {% if asset.image.value %}{{ asset.image.value | image_url: width: 1400 | json }}{% else %}null{% endif %}
+        }{% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    ]
+  </script>
+
+</section>
+</div>

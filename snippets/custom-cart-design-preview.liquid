@@ -1,0 +1,74 @@
+{% comment %}
+  Render inside the normal cart item markup for a customized base product.
+
+  Usage:
+    {% render 'custom-cart-design-preview', item: item, cart: cart %}
+
+  Printing-fee lines should be skipped separately in your main cart loop:
+    {% if item.properties['_item_type'] == 'print_fee' %}{% continue %}{% endif %}
+{% endcomment %}
+
+{% assign design_id = item.properties['_design_id'] %}
+{% assign item_type = item.properties['_item_type'] %}
+
+{% if design_id != blank and item_type == 'product' %}
+  {% assign front_zone = item.properties['_front_zone'] %}
+  {% assign front_areas = item.properties['Front print areas'] | default: front_zone %}
+  {% assign back_areas = item.properties['Back print areas'] %}
+  <div class="custom-cart-design" data-custom-cart-design="{{ design_id | escape }}" data-custom-design-preview="{{ design_id | escape }}">
+    <div class="custom-cart-design__previews">
+        <figure data-design-figure>
+          <a href="#" target="_blank" rel="noopener">
+            <img data-design-side="front" alt="Front custom design preview" loading="lazy" width="220" height="220">
+          </a>
+          <figcaption>Front{% if front_areas != blank %} · {{ front_areas }}{% endif %}</figcaption>
+        </figure>
+
+        <figure data-design-figure>
+          <a href="#" target="_blank" rel="noopener">
+            <img data-design-side="back" alt="Back custom design preview" loading="lazy" width="220" height="220">
+          </a>
+          <figcaption>Back{% if back_areas != blank %} · {{ back_areas }}{% endif %}</figcaption>
+        </figure>
+      <p data-design-fallback hidden>Design preview is temporarily unavailable.</p>
+    </div>
+
+    <div class="custom-cart-design__fees">
+      {% for fee_item in cart.items %}
+        {% if fee_item.properties['_design_id'] == design_id and fee_item.properties['_item_type'] == 'print_fee' %}
+          <div class="custom-cart-design__fee-row">
+            <span>
+              {% if fee_item.properties['_side'] == 'back' %}
+                Back print{% if fee_item.properties['Print area'] != blank %} · {{ fee_item.properties['Print area'] }}{% elsif fee_item.properties['_zone'] != blank %} · {{ fee_item.properties['_zone'] | remove_first: 'back-' | capitalize }}{% endif %}
+              {% else %}
+                Front print{% if fee_item.properties['Print area'] != blank %} · {{ fee_item.properties['Print area'] }}{% elsif fee_item.properties['_zone'] != blank %} · {{ fee_item.properties['_zone'] | capitalize }}{% endif %}
+              {% endif %}
+            </span>
+            <strong>{{ fee_item.final_line_price | money }}</strong>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+
+    <label class="custom-cart-design__quantity">
+      <span>Quantity</span>
+      <input
+        type="number"
+        min="1"
+        step="1"
+        value="{{ item.quantity }}"
+        data-custom-design-quantity="{{ design_id | escape }}"
+        aria-label="Custom product quantity"
+      >
+    </label>
+
+    <button
+      type="button"
+      class="button button--tertiary custom-cart-design__remove"
+      data-remove-custom-design="{{ design_id | escape }}"
+    >
+      Remove custom item
+    </button>
+  </div>
+{% endif %}

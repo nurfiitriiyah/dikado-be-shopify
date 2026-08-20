@@ -1,0 +1,48 @@
+{% liquid
+  assign custom_product = closest.product
+%}
+
+<div
+  class="custom-product-button-block"
+  {{ block.shopify_attributes }}
+>
+
+  {% comment %} <div style="
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid red;
+    font-size: 12px;
+  ">
+    <div>
+      Product:
+      {{ custom_product.title | default: 'NO PRODUCT' }}
+    </div>
+
+    <div>
+      Product ID:
+      {{ custom_product.id | default: 'NO PRODUCT ID' }}
+    </div>
+
+    <div>
+      Customizer enabled:
+      {{ custom_product.metafields.custom.customizer_enabled.value | json }}
+    </div>
+  </div> {% endcomment %}
+
+  {% render 'custom-product-button',
+    product: custom_product
+  %}
+
+</div>
+
+{% schema %}
+{
+  "name": "Custom product button",
+  "settings": [],
+  "presets": [
+    {
+      "name": "Custom product button"
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,23 @@
+client_id = "c2642e04ac712f3e63f0b7a1f1ea59b0"
+name = "Dikado Address Proxy"
+application_url = "https://dikado-in.myshopify.com"
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = true
+
+[webhooks]
+api_version = "2026-07"
+
+[access_scopes]
+scopes = "write_app_proxy"
+optional_scopes = []
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = []
+
+[app_proxy]
+url = "https://bpefhxamltfxunxfvnwc.supabase.co/functions/v1/shopify-app-proxy"
+prefix = "apps"
+subpath = "dikado-address"

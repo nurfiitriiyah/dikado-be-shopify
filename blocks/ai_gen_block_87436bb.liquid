@@ -1,0 +1,234 @@
+{% doc %}
+  @prompt
+    Create a Shopify review slider section.
+    
+    The section should allow me to add multiple customer reviews manually through the Shopify Theme Editor using review blocks.
+    
+    Requirements:
+    
+    * Display one review per slide.
+    * For example, if I add four reviews, the slider should contain four slides.
+    * Each review should include:
+    
+      * Customer name
+      * Review text
+      * Star rating
+      * Optional customer photo
+    * Add previous and next navigation buttons.
+    * Add pagination dots below the slider.
+    * Support swipe gestures on mobile devices.
+    * Include an optional autoplay setting with adjustable slide speed.
+    * The slider must be fully responsive on desktop, tablet, and mobile.
+    * Add customizable settings for the title, background color, text color, star color, and section spacing.
+    * Use Shopify Liquid, HTML, CSS, and JavaScript without external libraries.
+    * Make sure each section instance works independently and does not conflict with other sections on the page.
+    
+{% enddoc %}
+{% assign ai_gen_id = block.id | replace: '_', '' | downcase %}
+
+{% style %}
+  .ai-review-slider-{{ ai_gen_id }} {
+    display: block;
+    width: 100%;
+  }
+
+  .ai-review-slide-{{ ai_gen_id }} {
+    width: 100%;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+
+  .ai-review-card-{{ ai_gen_id }} {
+    background-color: {{ block.settings.card_background_color }};
+    border-radius: {{ block.settings.card_border_radius }}px;
+    padding: 40px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .ai-review-photo-{{ ai_gen_id }} {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    overflow: hidden;
+  }
+
+  .ai-review-photo-{{ ai_gen_id }} img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .ai-review-photo-placeholder-{{ ai_gen_id }} {
+    width: 100%;
+    height: 100%;
+    background-color: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ai-review-photo-placeholder-{{ ai_gen_id }} svg {
+    width: 40px;
+    height: 40px;
+    fill: #ccc;
+  }
+
+  .ai-review-stars-{{ ai_gen_id }} {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: 20px;
+  }
+
+  .ai-review-star-{{ ai_gen_id }} {
+    width: 20px;
+    height: 20px;
+  }
+
+  .ai-review-star-{{ ai_gen_id }} svg {
+    width: 100%;
+    height: 100%;
+    fill: {{ block.settings.star_color }};
+  }
+
+  .ai-review-star-empty-{{ ai_gen_id }} svg {
+    fill: #e0e0e0;
+  }
+
+  .ai-review-text-{{ ai_gen_id }} {
+    font-size: 16px;
+    line-height: 1.6;
+    color: {{ block.settings.text_color }};
+    margin-bottom: 20px;
+  }
+
+  .ai-review-name-{{ ai_gen_id }} {
+    font-size: 18px;
+    font-weight: 600;
+    color: {{ block.settings.text_color }};
+    margin: 0;
+  }
+
+  @media screen and (max-width: 749px) {
+    .ai-review-card-{{ ai_gen_id }} {
+      padding: 30px 20px;
+    }
+  }
+{% endstyle %}
+
+<div
+  class="ai-review-slider-{{ ai_gen_id }} ai-review-slide-{{ ai_gen_id }}"
+  {{ block.shopify_attributes }}
+>
+  <div class="ai-review-card-{{ ai_gen_id }}">
+    <div class="ai-review-photo-{{ ai_gen_id }}">
+      {% if block.settings.customer_photo %}
+        <img
+          src="{{ block.settings.customer_photo | image_url: width: 160 }}"
+          alt="{{ block.settings.customer_name | escape }}"
+          loading="lazy"
+          width="80"
+          height="80"
+        >
+      {% else %}
+        <div class="ai-review-photo-placeholder-{{ ai_gen_id }}">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="ai-review-stars-{{ ai_gen_id }}">
+      {% for i in (1..5) %}
+        <div class="ai-review-star-{{ ai_gen_id }} {% if i > block.settings.rating %}ai-review-star-empty-{{ ai_gen_id }}{% endif %}">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+          </svg>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="ai-review-text-{{ ai_gen_id }}">
+      {{ block.settings.review_text }}
+    </div>
+
+    <p class="ai-review-name-{{ ai_gen_id }}">{{ block.settings.customer_name }}</p>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Customer review",
+  "tag": null,
+  "settings": [
+    {
+      "type": "text",
+      "id": "customer_name",
+      "label": "Customer name",
+      "default": "Jane Doe"
+    },
+    {
+      "type": "textarea",
+      "id": "review_text",
+      "label": "Review text",
+      "default": "This product exceeded my expectations! The quality is outstanding and it arrived quickly. Highly recommend to anyone looking for a great purchase."
+    },
+    {
+      "type": "range",
+      "id": "rating",
+      "label": "Star rating",
+      "min": 1,
+      "max": 5,
+      "step": 1,
+      "default": 5
+    },
+    {
+      "type": "image_picker",
+      "id": "customer_photo",
+      "label": "Customer photo"
+    },
+    {
+      "type": "header",
+      "content": "Style"
+    },
+    {
+      "type": "color",
+      "id": "card_background_color",
+      "label": "Card background",
+      "default": "#f9f9f9"
+    },
+    {
+      "type": "range",
+      "id": "card_border_radius",
+      "label": "Card border radius",
+      "min": 0,
+      "max": 30,
+      "step": 2,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text color",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "star_color",
+      "label": "Star color",
+      "default": "#FFD700"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Customer review"
+    }
+  ]
+}
+{% endschema %}

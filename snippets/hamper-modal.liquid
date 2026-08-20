@@ -1,0 +1,81 @@
+{% comment %}Theme-level, single-hamper checkout configurator.{% endcomment %}
+{% if settings.hamper_enabled %}
+  {{ 'hamper-modal.css' | asset_url | stylesheet_tag }}
+  <script src="{{ 'hamper-modal.js' | asset_url }}" defer="defer"></script>
+
+  {% liquid
+    assign packaging_product = settings.hamper_packaging_product
+    assign packaging_variant = packaging_product.selected_or_first_available_variant
+  %}
+  <hamper-modal data-enabled="true">
+    <script type="application/json" data-hamper-config>
+      {
+        "box": {% if settings.hamper_box_base != blank %}{{ settings.hamper_box_base | image_url: width: 1200 | json }}{% else %}null{% endif %},
+        "ribbons": {
+          "Pink": {% if settings.hamper_ribbon_pink != blank %}{{ settings.hamper_ribbon_pink | image_url: width: 1200 | json }}{% else %}null{% endif %},
+          "Purple": {% if settings.hamper_ribbon_purple != blank %}{{ settings.hamper_ribbon_purple | image_url: width: 1200 | json }}{% else %}null{% endif %},
+          "Red": {% if settings.hamper_ribbon_red != blank %}{{ settings.hamper_ribbon_red | image_url: width: 1200 | json }}{% else %}null{% endif %},
+          "Navy": {% if settings.hamper_ribbon_navy != blank %}{{ settings.hamper_ribbon_navy | image_url: width: 1200 | json }}{% else %}null{% endif %},
+          "Cream": {% if settings.hamper_ribbon_cream != blank %}{{ settings.hamper_ribbon_cream | image_url: width: 1200 | json }}{% else %}null{% endif %}
+        },
+        "packaging": {% if packaging_product != blank and packaging_variant != blank %}{
+          "productId": {{ packaging_product.id | json }},
+          "variantId": {{ packaging_variant.id | json }},
+          "title": {{ packaging_product.title | json }},
+          "price": {{ packaging_variant.price | money_with_currency | json }},
+          "available": {{ packaging_variant.available | json }}
+        }{% else %}null{% endif %}
+      }
+    </script>
+
+    <dialog class="hamper-modal dialog-modal color-{{ settings.popover_color_scheme | default: 'scheme-1' }}" aria-labelledby="HamperTitle">
+      <div class="hamper-modal__processing" data-hamper-processing hidden role="status" aria-live="assertive" aria-label="Preparing your hamper">
+        <span class="hamper-modal__processing-spinner" aria-hidden="true"></span>
+        <strong>Preparing your hamper…</strong>
+        <span>Please wait. Don’t close this window.</span>
+      </div>
+
+      <button type="button" class="hamper-modal__close button close-button button-unstyled" data-hamper-close aria-label="Close">
+        <span class="svg-wrapper">{{ 'icon-close.svg' | inline_asset_content }}</span>
+      </button>
+
+      <section data-hamper-prompt>
+        <h2 id="HamperTitle">Make it a Hamper? 🎁</h2>
+        <p>Turn selected products into a beautifully packed gift hamper.</p>
+        <div class="hamper-modal__prompt-actions">
+          <button type="button" class="button button-secondary" data-hamper-normal><span class="button-text">No, Checkout Normally</span></button>
+          <button type="button" class="button" data-hamper-configure><span class="button-text">Yes, Make a Hamper</span></button>
+        </div>
+      </section>
+
+      <section class="hamper-modal__config" data-hamper-configurator hidden>
+        <header>
+          <h2>Customize your hamper</h2>
+          <p>Select compatible products and finish your gift.</p>
+        </header>
+        <div class="hamper-modal__grid">
+          <div class="hamper-modal__preview-panel">
+            <div class="hamper-modal__visual" data-hamper-visual></div>
+          </div>
+          <div class="hamper-modal__controls">
+            <fieldset>
+              <legend>Select products</legend>
+              <div class="hamper-modal__products" data-hamper-products></div>
+            </fieldset>
+            <fieldset>
+              <legend>Ribbon color</legend>
+              <div class="hamper-modal__ribbons" data-hamper-ribbons></div>
+            </fieldset>
+            <label class="hamper-modal__message">Gift Message
+              <textarea maxlength="250" rows="3" data-hamper-message></textarea>
+              <span data-hamper-count>0 / 250</span>
+            </label>
+            <div class="hamper-modal__packaging" data-hamper-packaging></div>
+            <p class="hamper-modal__error" data-hamper-error role="alert" hidden></p>
+            <button type="button" class="button" data-hamper-save><span class="button-text">Make My Hamper</span></button>
+          </div>
+        </div>
+      </section>
+    </dialog>
+  </hamper-modal>
+{% endif %}

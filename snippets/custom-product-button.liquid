@@ -1,0 +1,27 @@
+{% comment %}
+  Custom product button.
+
+  Usage inside your product form area (for example Dawn's sections/main-product.liquid):
+
+  {% render 'custom-product-button',
+    product: product,
+    product_form_id: product_form_id
+  %}
+{% endcomment %}
+
+{% if product and product.metafields.custom.customizer_enabled.value == true %}
+  <button
+    type="button"
+    class="button button--secondary customizer-launch-button"
+    data-customizer-open
+    data-product-id="{{ product.id }}"
+    data-product-handle="{{ product.handle | escape }}"
+    data-product-url="{{ product.url }}"
+    {% if product_form_id != blank %}
+      data-product-form-id="{{ product_form_id | escape }}"
+    {% endif %}
+    aria-haspopup="dialog"
+  >
+    Customize This Product
+  </button>
+{% endif %}

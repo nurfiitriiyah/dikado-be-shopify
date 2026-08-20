@@ -1,0 +1,15 @@
+{% if customer %}
+  <script type="module" src="{{ 'dikado-address-book.js' | asset_url }}"></script>
+  <dikado-address-book></dikado-address-book>
+{% else %}
+  <p><a href="{{ routes.account_login_url }}">Masuk</a> untuk mengelola alamat dan memilih pengiriman.</p>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Dikado address book",
+  "settings": [],
+  "presets": [{ "name": "Dikado address book" }]
+}
+{% endschema %}
+

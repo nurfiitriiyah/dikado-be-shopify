@@ -1,0 +1,153 @@
+{% comment %}
+  Review column used by sections/review-recommendations-grid.liquid
+
+  Required variables:
+  - reviews
+  - review_settings
+  - review_section_id
+{% endcomment %}
+
+<div class="rr-review-column">
+  <header class="rr-heading rr-heading--reviews">
+    {% if review_settings.review_logo != blank %}
+      {{
+        review_settings.review_logo
+        | image_url: width: 120
+        | image_tag:
+          class: 'rr-heading__logo',
+          widths: '48, 72, 96, 120',
+          sizes: '56px',
+          loading: 'lazy',
+          alt: review_settings.review_heading
+      }}
+    {% endif %}
+
+    <div>
+      <h2 id="ReviewHeading-{{ review_section_id }}" class="rr-heading__title">
+        {{ review_settings.review_heading | escape }}
+      </h2>
+
+      {% if review_settings.review_subtitle != blank %}
+        <p class="rr-heading__subtitle">{{ review_settings.review_subtitle | escape }}</p>
+      {% endif %}
+    </div>
+  </header>
+
+  {% if reviews != blank %}
+    <div class="rr-review-list">
+      {% for review_entry in reviews %}
+        {% liquid
+          assign reviewer_name = review_entry.reviewer_username.value | default: review_entry.reviewer_name.value | default: 'Member'
+          assign reviewer_avatar = review_entry.reviewer_avatar.value | default: review_entry.avatar.value
+          assign reviewer_initial = reviewer_name | slice: 0, 1 | upcase
+          assign skin_type = review_entry.skin_type.value
+          assign age_range = review_entry.age_range.value
+          assign rating = review_entry.rating.value | default: 5 | plus: 0
+          assign review_text = review_entry.review.value | default: review_entry.review_text.value
+          assign review_length = review_text | strip_html | size
+          assign usage_period = review_entry.usage_period.value
+          assign review_date = review_entry.review_date.value
+          assign recommended = true
+
+          if review_entry.recommended != blank
+            assign recommended = review_entry.recommended.value
+          endif
+        %}
+
+        <article class="rr-review-item">
+          <aside class="rr-review-profile">
+            {% if reviewer_avatar != blank %}
+              {{
+                reviewer_avatar
+                | image_url: width: 180
+                | image_tag:
+                  class: 'rr-review-avatar',
+                  widths: '72, 120, 180',
+                  sizes: '(max-width: 749px) 64px, 88px',
+                  loading: 'lazy',
+                  alt: reviewer_name
+              }}
+            {% else %}
+              <span class="rr-review-avatar rr-review-avatar--placeholder" aria-hidden="true">
+                {{ reviewer_initial }}
+              </span>
+            {% endif %}
+
+            <div class="rr-review-profile__text">
+              <h3 class="rr-review-name">{{ reviewer_name | escape }}</h3>
+
+              {% if skin_type != blank %}
+                <p class="rr-review-meta">{{ skin_type | escape }}</p>
+              {% endif %}
+
+              {% if age_range != blank %}
+                <p class="rr-review-meta">{{ age_range | escape }}</p>
+              {% endif %}
+            </div>
+          </aside>
+
+          <div class="rr-review-content">
+            <div class="rr-review-topline">
+              <div class="rr-stars" role="img" aria-label="{{ rating }} dari 5 bintang">
+                {% for index in (1..5) %}
+                  <span class="rr-star{% if index > rating %} rr-star--empty{% endif %}">★</span>
+                {% endfor %}
+              </div>
+
+              {% if review_date != blank %}
+                <time class="rr-review-date" datetime="{{ review_date | date: '%Y-%m-%d' }}">
+                  {{ review_date | date: review_settings.date_format }}
+                </time>
+              {% endif %}
+            </div>
+
+            {% if recommended %}
+              <div class="rr-recommended">
+                <span class="rr-recommended__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none">
+                    <path d="M7.5 10.2v9H4.7A1.7 1.7 0 0 1 3 17.5v-5.6a1.7 1.7 0 0 1 1.7-1.7h2.8Zm2 9V10l3.4-5.2c.6-.9 2-.5 2 .6v3.3h3.5c1.5 0 2.6 1.4 2.2 2.8l-1.7 5.9c-.3 1.1-1.3 1.8-2.4 1.8h-7Z" fill="currentColor"/>
+                  </svg>
+                </span>
+                <span>{{ review_settings.recommend_label | escape }}</span>
+              </div>
+            {% endif %}
+
+            {% if review_text != blank %}
+              <div class="rr-review-copy" data-review-wrap>
+                <div class="rr-review-text" data-review-text>
+                  {{ review_text | escape | newline_to_br }}
+                </div>
+
+                {% if review_length > review_settings.read_more_threshold %}
+                  <button
+                    class="rr-read-more"
+                    type="button"
+                    data-review-toggle
+                    aria-expanded="false"
+                  >
+                    {{ review_settings.read_more_label | escape }}
+                  </button>
+                {% endif %}
+              </div>
+            {% endif %}
+
+            {% if usage_period != blank %}
+              <div class="rr-usage-period">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                  <path d="M12 7v5l3.2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>{{ review_settings.usage_label | escape }}:</span>
+                <strong>{{ usage_period | escape }}</strong>
+              </div>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% elsif request.design_mode %}
+    <div class="rr-empty-state">
+      Belum ada review yang dipilih. Buka Products → pilih produk → Product Reviews.
+    </div>
+  {% endif %}
+</div>

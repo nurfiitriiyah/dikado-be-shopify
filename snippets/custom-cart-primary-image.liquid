@@ -1,0 +1,16 @@
+{% comment %}
+  Optional replacement for the normal cart thumbnail.
+  Pass `item` and optionally `width`.
+{% endcomment %}
+
+{% assign design_id = item.properties['_design_id'] %}
+{% assign render_width = width | default: 300 %}
+
+{% if design_id != blank %}
+  <span data-custom-design-preview="{{ design_id | escape }}">
+    <img data-design-side="front" alt="Custom product front preview" loading="lazy" width="{{ render_width }}" height="{{ render_width }}" style="object-fit: contain;">
+    <span data-design-fallback hidden>Design preview is temporarily unavailable.</span>
+  </span>
+{% elsif item.image %}
+  {{ item.image | image_url: width: render_width | image_tag: loading: 'lazy' }}
+{% endif %}

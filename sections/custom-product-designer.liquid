@@ -1,0 +1,354 @@
+{% comment %}
+  Reusable Custom Product Designer overlay.
+
+  Add this section once to the product template used by customizable products.
+  The launcher button is rendered separately with snippets/custom-product-button.liquid.
+{% endcomment %}
+
+{{ 'custom-product-designer.css' | asset_url | stylesheet_tag }}
+{{ 'bp-character-builder.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'bp-character-builder.js' | asset_url }}" defer="defer"></script>
+<script src="{{ 'character-builder.js' | asset_url }}" defer="defer"></script>
+<script src="{{ 'frame-editor.js' | asset_url }}" defer="defer"></script>
+<script src="{{ 'custom-design-storage.js' | asset_url }}" defer="defer"></script>
+<script src="{{ 'custom-product-designer.js' | asset_url }}" defer="defer"></script>
+
+{% if product and product.metafields.custom.customizer_enabled.value == true %}
+  <script id="customizer-product-config-{{ section.id }}" type="application/json">
+    {{ product.metafields.custom.customizer_config.value  | json }}
+  </script>
+
+  <script id="customizer-product-data-{{ section.id }}" type="application/json">
+    {
+      "productId": {{ product.id | json }},
+      "handle": {{ product.handle | json }},
+      "title": {{ product.title | json }},
+      "productUrl": {{ product.url | json }},
+      "currency": {{ cart.currency.iso_code | default: shop.currency | json }},
+      "featuredImage": {% if product.featured_image %}{{ product.featured_image | image_url: width: 2400 | json }}{% else %}null{% endif %},
+      "variants": {
+        {% for variant in product.variants %}
+          {% liquid
+            assign front_mockup = variant.metafields.custom.front_mockup.value
+            if front_mockup == blank
+              assign front_mockup = variant.metafields.custom.customizer_front_mockup.value
+            endif
+            if front_mockup == blank
+              assign front_mockup = variant.metafields.customizer.front_mockup.value
+            endif
+
+            assign back_mockup = variant.metafields.custom.customizer_back_mockup.value
+            if back_mockup == blank
+              assign back_mockup = variant.metafields.custom.back_mockup.value
+            endif
+            if back_mockup == blank
+              assign back_mockup = variant.metafields.customizer.back_mockup.value
+            endif
+
+            assign wrap_mockup = variant.metafields.custom.customizer_wrap_mockup.value
+            if wrap_mockup == blank
+              assign wrap_mockup = variant.metafields.custom.wrap_mockup.value
+            endif
+            if wrap_mockup == blank
+              assign wrap_mockup = variant.metafields.customizer.wrap_mockup.value
+            endif
+          %}
+          "{{ variant.id }}": {
+            "id": {{ variant.id | json }},
+            "title": {{ variant.title | json }},
+            "available": {{ variant.available | json }},
+            "priceMajor": {{ variant.price | divided_by: 100.0 | json }},
+            "priceFormatted": {{ variant.price | money | json }},
+            "front":
+              {% if front_mockup != blank %}
+                {{ front_mockup | image_url: width: 2400 | json }}
+              {% elsif variant.featured_image %}
+                {{ variant.featured_image | image_url: width: 2400 | json }}
+              {% elsif product.featured_image %}
+                {{ product.featured_image | image_url: width: 2400 | json }}
+              {% else %}
+                null
+              {% endif %},
+            "back":
+              {% if back_mockup != blank %}
+                {{ back_mockup | image_url: width: 2400 | json }}
+              {% else %}
+                null
+              {% endif %},
+            "wrap":
+              {% if wrap_mockup != blank %}
+                {{ wrap_mockup | image_url: width: 2400 | json }}
+              {% else %}
+                null
+              {% endif %}
+          }{% unless forloop.last %},{% endunless %}
+        {% endfor %}
+      }
+    }
+  </script>
+
+  <dialog
+    id="CustomProductDesigner-{{ section.id }}"
+    class="customizer-dialog"
+    data-custom-product-designer
+    data-section-id="{{ section.id }}"
+    data-config-script="customizer-product-config-{{ section.id }}"
+    data-product-script="customizer-product-data-{{ section.id }}"
+    aria-labelledby="CustomizerTitle-{{ section.id }}"
+  >
+    {% render 'bp-character-builder-embedded' %}
+
+    <div class="customizer-processing-overlay" data-customizer-processing hidden role="status" aria-live="assertive" aria-label="Processing custom design">
+      <span class="customizer-processing-spinner" aria-hidden="true"></span>
+      <strong data-processing-title>Adding your custom product…</strong>
+      <span data-processing-message>Please wait. Don’t close this window.</span>
+    </div>
+
+    <div class="customizer-shell">
+      <header class="customizer-header">
+        <div>
+          <p class="customizer-eyebrow">Custom product</p>
+          <h2 id="CustomizerTitle-{{ section.id }}" class="customizer-title">{{ product.title | escape }}</h2>
+          <p class="customizer-step-label" data-customizer-step-label>Create character</p>
+        </div>
+        <button type="button" class="customizer-icon-button" data-customizer-close aria-label="Close customizer">×</button>
+      </header>
+
+      <div class="customizer-body">
+        <section class="customizer-step is-active" data-step="character">
+          <div class="customizer-centered-card">
+            <span class="customizer-step-number">1</span>
+            <h3>Create your character</h3>
+            <p>Character is optional. You can skip this step if you only want text, a photo, or a logo.</p>
+            <div class="customizer-choice-grid">
+              <button type="button" class="customizer-choice-card" data-character-create>
+                <strong>Create Character</strong>
+                <span>Open the modular character builder and flatten the result into one transparent PNG.</span>
+              </button>
+              <button type="button" class="customizer-choice-card" data-character-skip>
+                <strong>Skip Character</strong>
+                <span>Go directly to the printable product area.</span>
+              </button>
+            </div>
+            <div class="customizer-character-result" data-character-result hidden>
+              <img data-character-preview alt="Finished custom character preview" width="144" height="144" />
+              <div>
+                <strong>Character ready</strong>
+                <p>The product editor will treat it as one image.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="customizer-step" data-step="zone">
+          <div class="customizer-centered-card">
+            <span class="customizer-step-number">2</span>
+            <h3>Choose print positions</h3>
+            <p>Select one or more print areas for the front surface.</p>
+            <div class="customizer-zone-options" data-zone-options></div>
+            <p class="customizer-zone-selection-summary" data-zone-selection-summary aria-live="polite"></p>
+            <div class="customizer-actions">
+              <button type="button" class="button button--secondary" data-back-to-character>Back</button>
+              <button type="button" class="button" data-zone-continue disabled>Design Front</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="customizer-step customizer-editor-step" data-step="editor">
+          <div class="customizer-editor-layout">
+            <aside class="customizer-toolbar" aria-label="Design tools">
+              <button type="button" data-tool-character>
+                <span aria-hidden="true">☺</span>
+                My Character
+              </button>
+              <button type="button" data-tool-text>
+                <span aria-hidden="true">T</span>
+                Add Text
+              </button>
+              <button type="button" data-tool-upload>
+                <span aria-hidden="true">↥</span>
+                Upload Image
+              </button>
+              <button type="button" data-tool-frame>
+                <span aria-hidden="true">▣</span>
+                Add Frame
+              </button>
+              <button type="button" data-tool-delete>
+                <span aria-hidden="true">⌫</span>
+                Delete
+              </button>
+              <input type="file" accept="image/png,image/jpeg,image/webp" data-image-upload hidden />
+            </aside>
+
+            <div class="customizer-stage-panel">
+              <div class="customizer-editor-topbar">
+                <div>
+                  <strong data-editor-side-label>Front</strong>
+                  <span data-editor-zone-label></span>
+                </div>
+                <div class="customizer-price-badge" data-editor-price></div>
+              </div>
+
+              <div class="customizer-editor-zones" data-editor-zones aria-label="Selected print areas"></div>
+
+              <div class="customizer-canvas-wrap" data-canvas-wrap>
+                <canvas data-customizer-canvas></canvas>
+                <div class="customizer-loading" data-canvas-loading hidden role="status" aria-live="polite">
+                  <span class="customizer-loading-spinner" aria-hidden="true"></span>
+                  <span>Preparing mockup…</span>
+                </div>
+              </div>
+
+              <div class="customizer-text-controls" data-text-controls hidden>
+                <label>
+                  Text
+                  <input type="text" data-text-value value="Your text" maxlength="120" />
+                </label>
+                <label>
+                  Font
+                  <select data-text-font>
+                    <option value="Arial">Arial</option>
+                    <option value="Helvetica">Helvetica</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier New">Courier New</option>
+                  </select>
+                </label>
+                <label>
+                  Size
+                  <input type="range" data-text-size min="14" max="160" step="1" value="48" />
+                </label>
+                <label>
+                  Color
+                  <input type="color" data-text-color value="#3b2a23" />
+                </label>
+              </div>
+
+              <div class="customizer-actions customizer-editor-actions">
+                <button type="button" class="button button--secondary" data-editor-back>Back</button>
+                <button type="button" class="button" data-editor-finish>Finish Front</button>
+              </div>
+              <p class="customizer-status customizer-editor-status" data-editor-status role="status"></p>
+            </div>
+
+            <aside class="customizer-summary-card" data-live-summary>
+              <h4>Price summary</h4>
+              <div class="customizer-summary-row"><span>Product</span><strong data-price-product>—</strong></div>
+              <div class="customizer-summary-row"><span data-price-front-label>Front print</span><strong data-price-front>—</strong></div>
+              <div class="customizer-summary-row" data-price-back-row hidden><span data-price-back-label>Back print</span><strong data-price-back>—</strong></div>
+              <div class="customizer-summary-row customizer-summary-total"><span>Estimated total</span><strong data-price-total>—</strong></div>
+              <p class="customizer-small-note">Checkout price is controlled by Shopify product and printing-fee variants.</p>
+              <div class="customizer-btn">
+                <button type="button" class="button button--secondary" data-editor-back>Back</button>
+                <button type="button" class="button" data-editor-finish>Finish Front</button>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="customizer-step" data-step="back-choice">
+          <div class="customizer-centered-card">
+            <span class="customizer-step-number">4</span>
+            <h3>Front design is ready</h3>
+            <div class="customizer-finished-preview">
+              <img data-front-finished-preview alt="Front design preview" width="720" height="720" />
+            </div>
+            <p data-back-price-message></p>
+            <div class="customizer-choice-grid">
+              <button type="button" class="customizer-choice-card" data-front-only>
+                <strong>Continue Front Only</strong>
+                <span>No extra back printing fee.</span>
+              </button>
+              <button type="button" class="customizer-choice-card" data-add-back>
+                <strong>Add Back Print</strong>
+                <span data-back-choice-description>The configured back print fee will be added.</span>
+              </button>
+            </div>
+            <p class="customizer-status" data-customizer-status role="status"></p>
+          </div>
+        </section>
+
+        <section class="customizer-step" data-step="back-mode">
+          <div class="customizer-centered-card">
+            <span class="customizer-step-number">5</span>
+            <h3>Design the back</h3>
+            <p>Reuse the flattened front artwork or create a different back design.</p>
+            <div class="customizer-choice-grid">
+              <button type="button" class="customizer-choice-card" data-back-same>
+                <strong>Use Same Design as Front</strong>
+                <span>Copy all Front print areas to the matching Back positions. The Back design will be identical and cannot be edited.</span>
+              </button>
+              <button type="button" class="customizer-choice-card" data-back-different>
+                <strong>Create Different Back Design</strong>
+                <span>Choose one or more Back print positions, then create a separate Back design.</span>
+              </button>
+            </div>
+            <div class="customizer-actions">
+              <button type="button" class="button button--secondary" data-back-mode-back>Back</button>
+            </div>
+            <p class="customizer-status" data-customizer-status role="status"></p>
+          </div>
+        </section>
+
+        <section class="customizer-step" data-step="back-zone">
+          <div class="customizer-centered-card">
+            <span class="customizer-step-number">5</span>
+            <h3>Choose back print positions</h3>
+            <p>Select one or more print areas for the back surface.</p>
+            <div class="customizer-zone-options" data-back-zone-options></div>
+            <p class="customizer-zone-selection-summary" data-back-zone-selection-summary aria-live="polite"></p>
+            <div class="customizer-actions">
+              <button type="button" class="button button--secondary" data-back-zone-mode>Back</button>
+              <button type="button" class="button" data-back-zone-continue disabled>Design Back</button>
+            </div>
+            <p class="customizer-status" data-customizer-status role="status"></p>
+          </div>
+        </section>
+
+        <section class="customizer-step" data-step="review">
+          <div class="customizer-review-layout">
+            <div>
+              <span class="customizer-step-number">6</span>
+              <h3>Review your custom product</h3>
+              <p>These previews include the actual Shopify product mockup. Production PNGs are transparent artwork only.</p>
+              <div class="customizer-review-previews">
+                <figure>
+                  <img data-review-front alt="Front product preview" width="900" height="900" />
+                  <figcaption>Front</figcaption>
+                </figure>
+                <figure data-review-back-wrap hidden>
+                  <img data-review-back alt="Back product preview" width="900" height="900" />
+                  <figcaption>Back</figcaption>
+                </figure>
+              </div>
+            </div>
+            <aside class="customizer-review-summary">
+              <h4>Order summary</h4>
+              <div class="customizer-summary-row"><span>Product</span><strong data-review-product-price>—</strong></div>
+              <div class="customizer-summary-row"><span data-review-front-label>Front print</span><strong data-review-front-price>—</strong></div>
+              <div class="customizer-summary-row" data-review-back-price-row hidden><span data-review-back-label>Back print</span><strong data-review-back-price>—</strong></div>
+              <div class="customizer-summary-row customizer-summary-total"><span>Estimated total</span><strong data-review-total>—</strong></div>
+              <button type="button" class="button customizer-add-cart" data-add-to-cart>Add Custom Product to Cart</button>
+              <button type="button" class="button button--secondary" data-review-back-edit>Back</button>
+              <p class="customizer-status" data-customizer-status role="status"></p>
+            </aside>
+          </div>
+        </section>
+      </div>
+    </div>
+  </dialog>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Custom product designer",
+  "tag": "section",
+  "class": "custom-product-designer-section",
+  "settings": [],
+  "presets": [
+    {
+      "name": "Custom product designer"
+    }
+  ]
+}
+{% endschema %}

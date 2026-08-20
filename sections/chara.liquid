@@ -1,0 +1,1068 @@
+{% if customer %}
+  <div id="CharacterApp-{{ section.id }}" class="character-app">
+    <!-- STEP 1: PILIH JENIS KARAKTER -->
+    <section class="character-selector" data-character-selector>
+      <h1 class="character-selector__heading">
+        {{ section.settings.heading | escape }}
+      </h1>
+
+      <button
+        type="button"
+        class="character-choice"
+        data-open-builder="goose"
+        aria-label="Create Goose Character"
+      >
+        <span class="character-choice__title">Create Goose Character</span>
+
+        <span class="character-choice__image">
+          {% if section.settings.goose_image != blank %}
+            {{
+              section.settings.goose_image
+              | image_url: width: 900
+              | image_tag:
+                loading: 'lazy',
+                widths: '360, 540, 720, 900',
+                sizes: '(max-width: 749px) 90vw, 420px',
+                alt: 'Create Goose Character',
+                class: 'character-choice__img'
+            }}
+          {% else %}
+            <span class="character-choice__placeholder">Upload goose image</span>
+          {% endif %}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        class="character-choice"
+        data-open-builder="human"
+        aria-label="Create Human Character"
+      >
+        <span class="character-choice__title">Create Human Character</span>
+
+        <span class="character-choice__image">
+          {% if section.settings.human_image != blank %}
+            {{
+              section.settings.human_image
+              | image_url: width: 900
+              | image_tag:
+                loading: 'lazy',
+                widths: '360, 540, 720, 900',
+                sizes: '(max-width: 749px) 90vw, 420px',
+                alt: 'Create Human Character',
+                class: 'character-choice__img'
+            }}
+          {% else %}
+            <span class="character-choice__placeholder">Upload human image</span>
+          {% endif %}
+        </span>
+      </button>
+    </section>
+
+    <!-- STEP 2: CUSTOM GOOSE -->
+    <section class="character-builder" data-character-builder="goose" hidden>
+      <button type="button" class="builder-back" data-back-to-selector>
+        ← Pilih karakter lain
+      </button>
+
+      <h1 class="builder-heading">
+        {{ section.settings.goose_heading | escape }}
+      </h1>
+
+      <!--
+        Empat view 2D. Klik view kecil untuk menjadikannya preview utama.
+        Semua pakaian dan aksesori akan berubah pada seluruh view sekaligus.
+      -->
+      <div class="goose-turnaround" data-goose-turnaround>
+        {% assign view_keys = 'front,back,side,three-quarter' | split: ',' %}
+        {% assign view_labels = 'Front,Back,Side,3/4 View' | split: ',' %}
+
+        {% for view_key in view_keys %}
+          {% assign base_image = blank %}
+
+          {% case view_key %}
+            {% when 'front' %}
+              {% assign base_image = section.settings.goose_base_front %}
+            {% when 'back' %}
+              {% assign base_image = section.settings.goose_base_back %}
+            {% when 'side' %}
+              {% assign base_image = section.settings.goose_base_side %}
+            {% when 'three-quarter' %}
+              {% assign base_image = section.settings.goose_base_three_quarter %}
+          {% endcase %}
+
+          <button
+            type="button"
+            class="goose-view-card{% if forloop.first %} is-main{% endif %}"
+            data-view-card="{{ view_key }}"
+            aria-label="Tampilkan {{ view_labels[forloop.index0] }}"
+            aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}"
+          >
+            <span class="goose-view-stage" data-view-stage="{{ view_key }}">
+              {% if base_image != blank %}
+                <img
+                  class="goose-layer goose-layer--base"
+                  data-layer="base"
+                  src="{{ base_image | image_url: width: 1600 }}"
+                  width="1200"
+                  height="1200"
+                  alt="Goose {{ view_labels[forloop.index0] }}"
+                  loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
+                >
+              {% elsif view_key == 'front' %}
+                <!-- URL CDN langsung. Jangan diberi filter asset_url. -->
+                <img
+                  class="goose-layer goose-layer--base"
+                  data-layer="base"
+                  src="https://cdn.shopify.com/s/files/1/0817/7306/8507/files/buddy_goose_front.png"
+                  width="1200"
+                  height="1200"
+                  alt="Goose Front"
+                  loading="eager"
+                >
+              {% elsif view_key == 'back' %}
+                <!-- URL CDN langsung. Jangan diberi filter asset_url. -->
+                <img
+                  class="goose-layer goose-layer--base"
+                  data-layer="base"
+                  src="https://cdn.shopify.com/s/files/1/0817/7306/8507/files/buddy_goose_back.png"
+                  width="1200"
+                  height="1200"
+                  alt="Goose Back"
+                  loading="eager"
+                >
+              {% elsif view_key == 'side' %}
+                <!-- URL CDN langsung. Jangan diberi filter asset_url. -->
+                <img
+                  class="goose-layer goose-layer--base"
+                  data-layer="base"
+                  src="https://cdn.shopify.com/s/files/1/0817/7306/8507/files/buddy_goose_side.png"
+                  width="1200"
+                  height="1200"
+                  alt="Goose Side"
+                  loading="eager"
+                >
+              {% elsif view_key == 'three-quarter' %}
+                <!-- URL CDN langsung. Jangan diberi filter asset_url. -->
+                <img
+                  class="goose-layer goose-layer--base"
+                  data-layer="base"
+                  src="https://cdn.shopify.com/s/files/1/0817/7306/8507/files/buddy_goose_quarter_side.png"
+                  width="1200"
+                  height="1200"
+                  alt="Goose 3/4"
+                  loading="eager"
+                >
+              {% else %}
+                <span class="goose-view-empty">
+                  Upload {{ view_labels[forloop.index0] }} base image
+                </span>
+              {% endif %}
+
+              <img class="goose-layer goose-layer--shoes" data-layer="shoes" alt="" hidden>
+              <img class="goose-layer goose-layer--pants" data-layer="pants" alt="" hidden>
+              <img class="goose-layer goose-layer--shirts" data-layer="shirts" alt="" hidden>
+              <img class="goose-layer goose-layer--hat" data-layer="hat" alt="" hidden>
+            </span>
+
+            <span class="goose-view-label">
+              {{ view_labels[forloop.index0] }}
+            </span>
+          </button>
+        {% endfor %}
+      </div>
+
+      <!-- CATEGORY TABS -->
+      <div class="goose-categories" role="tablist" aria-label="Goose customization categories">
+        <button
+          type="button"
+          class="is-active"
+          data-open-category="shirts"
+          role="tab"
+          aria-selected="true"
+        >
+          Shirt
+        </button>
+
+        <button
+          type="button"
+          data-open-category="pants"
+          role="tab"
+          aria-selected="false"
+        >
+          Pants
+        </button>
+
+        <button
+          type="button"
+          data-open-category="shoes"
+          role="tab"
+          aria-selected="false"
+        >
+          Shoes
+        </button>
+
+        <button
+          type="button"
+          data-open-category="hat"
+          role="tab"
+          aria-selected="false"
+        >
+          Hat
+        </button>
+      </div>
+
+      {% assign category_keys = 'shirts,pants,shoes,hat' | split: ',' %}
+      {% assign category_labels = 'Shirt,Pants,Shoes,Hat' | split: ',' %}
+
+      {% for category_key in category_keys %}
+        <div
+          class="goose-option-panel"
+          data-category-panel="{{ category_key }}"
+          role="tabpanel"
+          {% unless forloop.first %}hidden{% endunless %}
+        >
+          <div class="goose-option-grid">
+            <button
+              type="button"
+              class="goose-option-card goose-option-card--remove is-selected"
+              data-goose-option
+              data-option-type="{{ category_key }}"
+              data-option-value=""
+              aria-pressed="true"
+            >
+              <span class="goose-option-card__remove-icon">×</span>
+              <span>Tanpa {{ category_labels[forloop.index0] }}</span>
+            </button>
+
+            {% for block in section.blocks %}
+              {% if block.type == 'goose_option' and block.settings.category == category_key %}
+                {% assign option_value = block.settings.option_id | default: block.settings.title | handleize %}
+                {% assign option_thumbnail = block.settings.thumbnail | default: block.settings.front_image %}
+
+                <button
+                  type="button"
+                  class="goose-option-card"
+                  data-goose-option
+                  data-option-type="{{ category_key }}"
+                  data-option-value="{{ option_value | escape }}"
+                  data-front="{% if block.settings.front_image != blank %}{{ block.settings.front_image | image_url: width: 1600 }}{% endif %}"
+                  data-back="{% if block.settings.back_image != blank %}{{ block.settings.back_image | image_url: width: 1600 }}{% endif %}"
+                  data-side="{% if block.settings.side_image != blank %}{{ block.settings.side_image | image_url: width: 1600 }}{% endif %}"
+                  data-three-quarter="{% if block.settings.three_quarter_image != blank %}{{ block.settings.three_quarter_image | image_url: width: 1600 }}{% endif %}"
+                  aria-pressed="false"
+                  {{ block.shopify_attributes }}
+                >
+                  <span class="goose-option-card__image">
+                    {% if option_thumbnail != blank %}
+                      {{
+                        option_thumbnail
+                        | image_url: width: 360
+                        | image_tag:
+                          loading: 'lazy',
+                          widths: '180, 270, 360',
+                          sizes: '140px',
+                          alt: block.settings.title
+                      }}
+                    {% else %}
+                      <span class="goose-option-card__placeholder">No image</span>
+                    {% endif %}
+                  </span>
+
+                  <span class="goose-option-card__title">
+                    {{ block.settings.title | default: 'Untitled option' | escape }}
+                  </span>
+                </button>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+
+      <div class="goose-actions">
+        <button type="button" class="save-goose-button" data-save-goose>
+          Save My Goose
+        </button>
+
+        <p class="save-message" data-save-message hidden aria-live="polite"></p>
+      </div>
+    </section>
+
+    <!-- CUSTOM HUMAN -->
+    <section class="character-builder" data-character-builder="human" hidden>
+      <button type="button" class="builder-back" data-back-to-selector>
+        ← Pilih karakter lain
+      </button>
+
+      <h1 class="builder-heading">Customize Your Character</h1>
+      <p>Human character builder bisa diletakkan di bagian ini.</p>
+    </section>
+  </div>
+{% else %}
+  <div class="character-login-required">
+    <h2>Login untuk Membuat Karakter</h2>
+    <p>Kamu perlu login atau membuat akun sebelum mulai membuat karakter.</p>
+    <a href="{{ routes.account_login_url }}">Login / Daftar</a>
+  </div>
+{% endif %}
+
+<script>
+  (() => {
+    const app = document.querySelector('#CharacterApp-{{ section.id }}');
+
+    if (!app || app.dataset.initialized === 'true') return;
+    app.dataset.initialized = 'true';
+
+    const selector = app.querySelector('[data-character-selector]');
+    const builders = [...app.querySelectorAll('[data-character-builder]')];
+    const openButtons = [...app.querySelectorAll('[data-open-builder]')];
+    const backButtons = [...app.querySelectorAll('[data-back-to-selector]')];
+    const categoryButtons = [...app.querySelectorAll('[data-open-category]')];
+    const categoryPanels = [...app.querySelectorAll('[data-category-panel]')];
+    const optionButtons = [...app.querySelectorAll('[data-goose-option]')];
+    const viewCards = [...app.querySelectorAll('[data-view-card]')];
+    const saveButton = app.querySelector('[data-save-goose]');
+    const saveMessage = app.querySelector('[data-save-message]');
+
+    const customerId = {{ customer.id | default: 'guest' | json }};
+    const storageKey = `custom-goose-design:${customerId}`;
+    const viewNames = ['front', 'back', 'side', 'three-quarter'];
+    const optionTypes = ['shirts', 'pants', 'shoes', 'hat'];
+
+    const gooseState = {
+      shirts: null,
+      pants: null,
+      shoes: null,
+      hat: null,
+      activeView: 'front'
+    };
+
+    function closeAllBuilders() {
+      builders.forEach((builder) => {
+        builder.hidden = true;
+      });
+    }
+
+    function openBuilder(builderName) {
+      const builder = builders.find(
+        (item) => item.dataset.characterBuilder === builderName
+      );
+
+      if (!builder || !selector) return;
+
+      selector.hidden = true;
+      closeAllBuilders();
+      builder.hidden = false;
+
+      builder.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+
+    function showSelector() {
+      if (!selector) return;
+
+      closeAllBuilders();
+      selector.hidden = false;
+
+      selector.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+
+    function activateCategory(categoryName) {
+      categoryPanels.forEach((panel) => {
+        panel.hidden = panel.dataset.categoryPanel !== categoryName;
+      });
+
+      categoryButtons.forEach((button) => {
+        const isActive = button.dataset.openCategory === categoryName;
+        button.classList.toggle('is-active', isActive);
+        button.setAttribute('aria-selected', String(isActive));
+      });
+    }
+
+    function activateView(viewName) {
+      if (!viewNames.includes(viewName)) return;
+
+      gooseState.activeView = viewName;
+
+      viewCards.forEach((card) => {
+        const isMain = card.dataset.viewCard === viewName;
+        card.classList.toggle('is-main', isMain);
+        card.setAttribute('aria-pressed', String(isMain));
+      });
+    }
+
+    function findOptionButton(type, value) {
+      return optionButtons.find(
+        (button) =>
+          button.dataset.optionType === type &&
+          (button.dataset.optionValue || '') === (value || '')
+      );
+    }
+
+    function updateSelectedOptionUI(type) {
+      const selectedValue = gooseState[type] || '';
+
+      optionButtons
+        .filter((button) => button.dataset.optionType === type)
+        .forEach((button) => {
+          const isSelected =
+            (button.dataset.optionValue || '') === selectedValue;
+
+          button.classList.toggle('is-selected', isSelected);
+          button.setAttribute('aria-pressed', String(isSelected));
+        });
+    }
+
+    function updateLayer(type) {
+      const selectedButton = findOptionButton(type, gooseState[type]);
+
+      viewNames.forEach((viewName) => {
+        const stage = app.querySelector(`[data-view-stage="${viewName}"]`);
+        const layer = stage?.querySelector(`[data-layer="${type}"]`);
+        const imageUrl = selectedButton?.getAttribute(`data-${viewName}`) || '';
+
+        if (!layer) return;
+
+        if (imageUrl) {
+          layer.src = imageUrl;
+          layer.hidden = false;
+        } else {
+          layer.removeAttribute('src');
+          layer.hidden = true;
+        }
+      });
+    }
+
+    function updateGoosePreview() {
+      optionTypes.forEach((type) => {
+        updateSelectedOptionUI(type);
+        updateLayer(type);
+      });
+
+      activateView(gooseState.activeView || 'front');
+    }
+
+    openButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        openBuilder(button.dataset.openBuilder);
+      });
+    });
+
+    backButtons.forEach((button) => {
+      button.addEventListener('click', showSelector);
+    });
+
+    categoryButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        activateCategory(button.dataset.openCategory);
+      });
+    });
+
+    viewCards.forEach((card) => {
+      card.addEventListener('click', () => {
+        activateView(card.dataset.viewCard);
+      });
+    });
+
+    optionButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const type = button.dataset.optionType;
+        const value = button.dataset.optionValue || null;
+
+        if (!optionTypes.includes(type)) return;
+
+        gooseState[type] = value;
+        updateSelectedOptionUI(type);
+        updateLayer(type);
+
+        if (saveMessage) {
+          saveMessage.hidden = true;
+        }
+      });
+    });
+
+    saveButton?.addEventListener('click', () => {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(gooseState));
+
+        if (saveMessage) {
+          saveMessage.hidden = false;
+          saveMessage.textContent = 'Goose kamu sudah disimpan di browser ini.';
+        }
+      } catch (error) {
+        console.error('Failed to save goose:', error);
+
+        if (saveMessage) {
+          saveMessage.hidden = false;
+          saveMessage.textContent = 'Goose belum berhasil disimpan. Coba lagi.';
+        }
+      }
+    });
+
+    try {
+      const savedGoose = localStorage.getItem(storageKey);
+
+      if (savedGoose) {
+        const parsedGoose = JSON.parse(savedGoose);
+
+        optionTypes.forEach((type) => {
+          const savedValue = parsedGoose[type] || null;
+
+          if (!savedValue || findOptionButton(type, savedValue)) {
+            gooseState[type] = savedValue;
+          }
+        });
+
+        if (viewNames.includes(parsedGoose.activeView)) {
+          gooseState.activeView = parsedGoose.activeView;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to restore goose:', error);
+    }
+
+    activateCategory('shirts');
+    updateGoosePreview();
+  })();
+</script>
+
+<style>
+  #CharacterApp-{{ section.id }} {
+    --cb-purple: #a879ef;
+    --cb-blue: #83afe3;
+    --cb-pink: #f788c4;
+    --cb-ink: #28232d;
+    --cb-panel: #f4f1f4;
+    --cb-border: rgba(40, 35, 45, 0.12);
+
+    width: min(1240px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 48px 0 72px;
+    color: var(--cb-ink);
+  }
+
+  #CharacterApp-{{ section.id }} [hidden] {
+    display: none !important;
+  }
+
+  #CharacterApp-{{ section.id }} button {
+    font: inherit;
+  }
+
+  #CharacterApp-{{ section.id }} .character-selector {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 42px;
+    text-align: center;
+  }
+
+  #CharacterApp-{{ section.id }} .character-selector__heading {
+    grid-column: 1 / -1;
+    margin: 0 0 8px;
+  }
+
+  #CharacterApp-{{ section.id }} .character-choice {
+    appearance: none;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    align-items: center;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  #CharacterApp-{{ section.id }} .character-choice__title {
+    font-weight: 700;
+    font-size: clamp(1.1rem, 2vw, 1.45rem);
+  }
+
+  #CharacterApp-{{ section.id }} .character-choice__image {
+    display: grid;
+    width: min(100%, 420px);
+    aspect-ratio: 1;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 50%;
+    background: var(--cb-pink);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  #CharacterApp-{{ section.id }} .character-choice__img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  #CharacterApp-{{ section.id }} .character-choice__placeholder {
+    padding: 24px;
+    font-weight: 700;
+  }
+
+  #CharacterApp-{{ section.id }} .character-choice:hover .character-choice__image {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 18px 38px rgba(71, 38, 94, 0.18);
+  }
+
+  #CharacterApp-{{ section.id }} .character-choice:focus-visible,
+  #CharacterApp-{{ section.id }} .goose-view-card:focus-visible,
+  #CharacterApp-{{ section.id }} .goose-option-card:focus-visible,
+  #CharacterApp-{{ section.id }} .goose-categories button:focus-visible,
+  #CharacterApp-{{ section.id }} .builder-back:focus-visible,
+  #CharacterApp-{{ section.id }} .save-goose-button:focus-visible {
+    outline: 3px solid #7e3ff2;
+    outline-offset: 4px;
+  }
+
+  #CharacterApp-{{ section.id }} .character-builder {
+    text-align: center;
+  }
+
+  #CharacterApp-{{ section.id }} .builder-back {
+    display: block;
+    border: 0;
+    padding: 10px 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  #CharacterApp-{{ section.id }} .builder-heading {
+    margin: 12px 0 32px;
+    font-size: clamp(2.2rem, 5vw, 4rem);
+    line-height: 1.05;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-turnaround {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(150px, 0.65fr);
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+
+width: min(100%, 650px);
+min-height: 400px;
+
+  margin: 0 auto 32px;
+}
+
+
+  #CharacterApp-{{ section.id }} .goose-view-card {
+    appearance: none;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 8px;
+    grid-column: 2;
+    align-items: stretch;
+    border: 1px solid var(--cb-border);
+    border-radius: 24px;
+    padding: 12px;
+    background: #fff;
+    color: inherit;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(40, 35, 45, 0.06);
+    transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-view-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(126, 63, 242, 0.38);
+    box-shadow: 0 14px 34px rgba(40, 35, 45, 0.1);
+  }
+
+  #CharacterApp-{{ section.id }} .goose-view-card.is-main {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    padding: 18px;
+    border-color: rgba(126, 63, 242, 0.28);
+  }
+
+  #CharacterApp-{{ section.id }} .goose-view-stage {
+    position: relative;
+    display: block;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    border-radius: 18px;
+    aspect-ratio: 1 / 1;
+    background: linear-gradient(180deg, #fff 0%, #faf8fb 100%);
+  }
+
+  #CharacterApp-{{ section.id }} .goose-layer {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-layer--base {
+    z-index: 10;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-layer--shoes {
+    z-index: 20;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-layer--pants {
+    z-index: 30;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-layer--shirts {
+    z-index: 40;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-layer--hat {
+    z-index: 50;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-view-empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    color: rgba(40, 35, 45, 0.58);
+    font-size: 0.9rem;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-view-label {
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-categories {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(120px, 1fr));
+    align-items: end;
+    margin-top: 24px;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-categories button {
+    min-height: 64px;
+    border: 0;
+    border-radius: 46% 68% 0 0;
+    padding: 16px 18px;
+    background: var(--cb-blue);
+    color: #1f2832;
+    cursor: pointer;
+    font-weight: 700;
+    transition: transform 150ms ease, background 150ms ease;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-categories button:hover {
+    transform: translateY(-4px);
+  }
+
+  #CharacterApp-{{ section.id }} .goose-categories button.is-active {
+    background: var(--cb-purple);
+    color: #fff;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-option-panel {
+    border-radius: 0 0 24px 24px;
+    padding: 28px;
+    background: var(--cb-panel);
+  }
+
+  #CharacterApp-{{ section.id }} .goose-option-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 16px;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-option-card {
+    appearance: none;
+    display: flex;
+    min-height: 176px;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid transparent;
+    border-radius: 18px;
+    padding: 12px;
+    background: #fff;
+    color: inherit;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(40, 35, 45, 0.06);
+  }
+
+  #CharacterApp-{{ section.id }} .goose-option-card.is-selected {
+    border-color: #7e3ff2;
+    box-shadow: 0 0 0 4px rgba(126, 63, 242, 0.14);
+  }
+
+  #CharacterApp-{{ section.id }} .goose-option-card__image {
+    display: grid;
+    width: 100%;
+    aspect-ratio: 1;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 12px;
+    background: #faf8fb;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-option-card__image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-option-card__title {
+    font-weight: 700;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-option-card--remove {
+    color: rgba(40, 35, 45, 0.72);
+  }
+
+  #CharacterApp-{{ section.id }} .goose-option-card__remove-icon {
+    display: grid;
+    width: 64px;
+    height: 64px;
+    place-items: center;
+    border-radius: 50%;
+    background: #ece8ed;
+    font-size: 2.2rem;
+    line-height: 1;
+  }
+
+  #CharacterApp-{{ section.id }} .goose-actions {
+    margin-top: 28px;
+  }
+
+  #CharacterApp-{{ section.id }} .save-goose-button {
+    min-width: min(100%, 260px);
+    border: 0;
+    border-radius: 999px;
+    padding: 15px 26px;
+    background: #7e3ff2;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 800;
+  }
+
+  #CharacterApp-{{ section.id }} .save-message {
+    margin: 14px 0 0;
+    font-weight: 700;
+  }
+
+  .character-login-required {
+    width: min(680px, calc(100% - 32px));
+    margin: 64px auto;
+    border-radius: 24px;
+    padding: 36px;
+    text-align: center;
+    background: #f6f2fa;
+  }
+
+  .character-login-required a {
+    display: inline-block;
+    margin-top: 12px;
+    border-radius: 999px;
+    padding: 12px 22px;
+    background: #7e3ff2;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 800;
+  }
+
+  @media screen and (max-width: 749px) {
+    #CharacterApp-{{ section.id }} {
+      padding-top: 32px;
+    }
+
+    #CharacterApp-{{ section.id }} .character-selector {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+
+    #CharacterApp-{{ section.id }} .character-selector__heading {
+      grid-column: auto;
+    }
+
+    #CharacterApp-{{ section.id }} .goose-turnaround {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-rows: auto;
+      min-height: 0;
+    }
+
+    #CharacterApp-{{ section.id }} .goose-view-card,
+    #CharacterApp-{{ section.id }} .goose-view-card.is-main {
+      grid-column: auto;
+      grid-row: auto;
+      padding: 8px;
+      border-radius: 16px;
+    }
+
+    #CharacterApp-{{ section.id }} .goose-view-card.is-main {
+      grid-column: 1 / -1;
+      padding: 12px;
+    }
+
+    #CharacterApp-{{ section.id }} .goose-view-stage {
+      border-radius: 12px;
+    }
+
+    #CharacterApp-{{ section.id }} .goose-categories {
+      display: flex;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+
+    #CharacterApp-{{ section.id }} .goose-categories button {
+      flex: 0 0 132px;
+    }
+
+    #CharacterApp-{{ section.id }} .goose-option-panel {
+      padding: 18px;
+    }
+
+    #CharacterApp-{{ section.id }} .goose-option-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>
+
+{% schema %}
+{
+  "name": "Character Builder",
+  "max_blocks": 50,
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Selector heading",
+      "default": "Pilih karakter yang mau kamu buat"
+    },
+    {
+      "type": "image_picker",
+      "id": "goose_image",
+      "label": "Goose selector image"
+    },
+    {
+      "type": "image_picker",
+      "id": "human_image",
+      "label": "Human selector image"
+    },
+    {
+      "type": "header",
+      "content": "Goose builder"
+    },
+    {
+      "type": "text",
+      "id": "goose_heading",
+      "label": "Goose builder heading",
+      "default": "Customize Your Goose"
+    },
+    {
+      "type": "image_picker",
+      "id": "goose_base_front",
+      "label": "Base goose — Front"
+    },
+    {
+      "type": "image_picker",
+      "id": "goose_base_back",
+      "label": "Base goose — Back"
+    },
+    {
+      "type": "image_picker",
+      "id": "goose_base_side",
+      "label": "Base goose — Side"
+    },
+    {
+      "type": "image_picker",
+      "id": "goose_base_three_quarter",
+      "label": "Base goose — 3/4 view"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "goose_option",
+      "name": "Goose option",
+      "settings": [
+        {
+          "type": "text",
+          "id": "title",
+          "label": "Option name",
+          "default": "New option"
+        },
+        {
+          "type": "text",
+          "id": "option_id",
+          "label": "Option ID",
+          "info": "Gunakan ID unik tanpa spasi, misalnya firefighter-hat-red."
+        },
+        {
+          "type": "select",
+          "id": "category",
+          "label": "Category",
+          "default": "shirts",
+          "options": [
+            {
+              "value": "shirts",
+              "label": "Shirt"
+            },
+            {
+              "value": "pants",
+              "label": "Pants"
+            },
+            {
+              "value": "shoes",
+              "label": "Shoes"
+            },
+            {
+              "value": "hat",
+              "label": "Hat"
+            }
+          ]
+        },
+        {
+          "type": "image_picker",
+          "id": "thumbnail",
+          "label": "Option thumbnail"
+        },
+        {
+          "type": "image_picker",
+          "id": "front_image",
+          "label": "Layer — Front"
+        },
+        {
+          "type": "image_picker",
+          "id": "back_image",
+          "label": "Layer — Back"
+        },
+        {
+          "type": "image_picker",
+          "id": "side_image",
+          "label": "Layer — Side"
+        },
+        {
+          "type": "image_picker",
+          "id": "three_quarter_image",
+          "label": "Layer — 3/4 view"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Character Builder"
+    }
+  ]
+}
+{% endschema %}
