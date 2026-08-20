@@ -63,6 +63,12 @@
     return URL.createObjectURL(blob);
   }
 
+  function showClientWatermark(image) {
+    if (window.CustomDesignStorage && typeof window.CustomDesignStorage.applyWatermark === 'function') {
+      window.CustomDesignStorage.applyWatermark(image);
+    }
+  }
+
   function loadNativeImage(src) {
     return new Promise(function (resolve, reject) {
       var image = new Image();
@@ -767,47 +773,18 @@
       object.visible = false;
       return { object: object, visible: visible };
     });
-    var watermarkObjects = [];
     var dataUrl;
     try {
       this.canvas.discardActiveObject();
       this.canvas.requestRenderAll();
 
       var multiplier = Math.max(1, Math.min(2, PREVIEW_MAX_WIDTH / this.canvas.getWidth()));
-      var watermarkText = 'CUSTOM PREVIEW · dikado.in';
-      var spacingX = 360;
-      var spacingY = 220;
-      for (var y = -this.canvas.getHeight(); y < this.canvas.getHeight() * 2; y += spacingY) {
-        for (var x = -this.canvas.getWidth(); x < this.canvas.getWidth() * 2; x += spacingX) {
-          var watermark = new fabric.Text(watermarkText, {
-            left: x,
-            top: y,
-            angle: -28,
-            fill: 'rgba(255, 255, 255, 0.58)',
-            stroke: 'rgba(0, 0, 0, 0.16)',
-            strokeWidth: 1,
-            fontFamily: 'Arial, sans-serif',
-            fontSize: 34,
-            fontWeight: '700',
-            selectable: false,
-            evented: false,
-            excludeFromExport: false,
-            _customizerRole: 'preview-watermark'
-          });
-          watermarkObjects.push(watermark);
-          this.canvas.add(watermark);
-          this.canvas.bringToFront(watermark);
-        }
-      }
-      this.canvas.requestRenderAll();
-
       dataUrl = this.canvas.toDataURL({
         format: 'png',
         multiplier: multiplier,
         enableRetinaScaling: false
       });
     } finally {
-      watermarkObjects.forEach(function (watermark) { this.canvas.remove(watermark); }, this);
       guideVisibility.forEach(function (entry) { entry.object.visible = entry.visible; });
       this.canvas.requestRenderAll();
     }
@@ -1702,7 +1679,9 @@
       }, this);
       this.state.frontCompositeArtwork = this.canvasEditor.exportCompositeArtwork('front-composite-' + id + '.png');
       this.state.frontPreview = this.canvasEditor.exportPreview('preview-front-' + id + '.png');
-      this.root.querySelector('[data-front-finished-preview]').src = this.trackUrl(blobUrl(this.state.frontPreview));
+      var finishedPreview = this.root.querySelector('[data-front-finished-preview]');
+      finishedPreview.src = this.trackUrl(blobUrl(this.state.frontPreview));
+      showClientWatermark(finishedPreview);
 
       if (this.isBackPrintAvailable()) {
         var sameBackZones = this.getSameBackZones();
@@ -1936,11 +1915,15 @@
       !this.state.backPreview
     )) return;
     this.showStep('review');
-    this.root.querySelector('[data-review-front]').src = this.trackUrl(blobUrl(this.state.frontPreview));
+    var reviewFront = this.root.querySelector('[data-review-front]');
+    reviewFront.src = this.trackUrl(blobUrl(this.state.frontPreview));
+    showClientWatermark(reviewFront);
     var backWrap = this.root.querySelector('[data-review-back-wrap]');
     if (this.state.hasBack && this.state.backPreview) {
       backWrap.hidden = false;
-      this.root.querySelector('[data-review-back]').src = this.trackUrl(blobUrl(this.state.backPreview));
+      var reviewBack = this.root.querySelector('[data-review-back]');
+      reviewBack.src = this.trackUrl(blobUrl(this.state.backPreview));
+      showClientWatermark(reviewBack);
     } else {
       backWrap.hidden = true;
       this.root.querySelector('[data-review-back]').removeAttribute('src');
