@@ -28,7 +28,9 @@ function Extension() {
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [defaultingId, setDefaultingId] = useState('');
   const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
@@ -80,30 +82,42 @@ function Extension() {
     setForm((current) => ({...current, [name]: value}));
   }
 
+  function resetForm() {
+    setForm({...emptyForm});
+    setFormError('');
+    setLocations((current) => ({...current, cities: [], districts: [], subdistricts: []}));
+  }
+
+  function prepareAdd() {
+    resetForm();
+    setError('');
+    setSuccess('');
+  }
+
   async function onProvinceChange(event) {
     const value = eventValue(event);
     setForm((current) => ({...current, province_id: value, city_id: '', district_id: '', subdistrict_id: ''}));
     setLocations((current) => ({...current, cities: [], districts: [], subdistricts: []}));
-    if (value) await loadLocations('cities', value).catch((requestError) => setError(errorMessage(requestError)));
+    if (value) await loadLocations('cities', value).catch((requestError) => setFormError(errorMessage(requestError)));
   }
 
   async function onCityChange(event) {
     const value = eventValue(event);
     setForm((current) => ({...current, city_id: value, district_id: '', subdistrict_id: ''}));
     setLocations((current) => ({...current, districts: [], subdistricts: []}));
-    if (value) await loadLocations('districts', value).catch((requestError) => setError(errorMessage(requestError)));
+    if (value) await loadLocations('districts', value).catch((requestError) => setFormError(errorMessage(requestError)));
   }
 
   async function onDistrictChange(event) {
     const value = eventValue(event);
     setForm((current) => ({...current, district_id: value, subdistrict_id: ''}));
     setLocations((current) => ({...current, subdistricts: []}));
-    if (value) await loadLocations('subdistricts', value).catch((requestError) => setError(errorMessage(requestError)));
+    if (value) await loadLocations('subdistricts', value).catch((requestError) => setFormError(errorMessage(requestError)));
   }
 
   async function onSubmit() {
     setSaving(true);
-    setError('');
+    setFormError('');
     setSuccess('');
     try {
       await api('/addresses', {
@@ -117,13 +131,29 @@ function Extension() {
         }),
       });
       setSuccess('Alamat berhasil disimpan.');
-      setForm(emptyForm);
-      setLocations((current) => ({...current, cities: [], districts: [], subdistricts: []}));
+      resetForm();
       await loadAddresses();
+      const modal = document.getElementById('address-modal');
+      if (modal && 'hideOverlay' in modal && typeof modal.hideOverlay === 'function') modal.hideOverlay();
+    } catch (requestError) {
+      setFormError(errorMessage(requestError));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onSetDefault(addressId) {
+    setDefaultingId(addressId);
+    setError('');
+    setSuccess('');
+    try {
+      await api(`/addresses/${addressId}/default`, {method: 'POST'});
+      await loadAddresses();
+      setSuccess('Alamat utama berhasil diperbarui.');
     } catch (requestError) {
       setError(errorMessage(requestError));
     } finally {
-      setSaving(false);
+      setDefaultingId('');
     }
   }
 
@@ -132,6 +162,9 @@ function Extension() {
 
   return (
     <s-page heading="Alamat Pengiriman" subheading="Kelola alamat Indonesia yang tervalidasi">
+      <s-button slot="primary-action" variant="primary" command="--show" commandFor="address-modal" onClick={prepareAdd}>
+        Tambah alamat
+      </s-button>
       <s-stack direction="block" gap="base">
         {error && <s-banner heading="Terjadi kesalahan" tone="critical">{error}</s-banner>}
         {success && <s-banner heading="Berhasil" tone="success">{success}</s-banner>}
@@ -152,16 +185,30 @@ function Extension() {
                     <s-paragraph color="subdued">
                       {address.address_line}, Kel. {address.subdistrict_name}, Kec. {address.district_name}, {address.city_name}, {address.province_name}{address.postcode ? ` ${address.postcode}` : ''}
                     </s-paragraph>
+                    {!address.is_default && (
+                      <s-button
+                        variant="secondary"
+                        loading={defaultingId === address.id}
+                        disabled={Boolean(defaultingId)}
+                        onClick={() => void onSetDefault(address.id)}
+                      >
+                        Jadikan alamat utama
+                      </s-button>
+                    )}
                   </s-stack>
                 </s-box>
               ))}
             </s-stack>
           ) : (
-            <s-paragraph color="subdued">Belum ada alamat tersimpan.</s-paragraph>
+            <s-stack direction="block" gap="base">
+              <s-paragraph color="subdued">Belum ada alamat tersimpan.</s-paragraph>
+              <s-button command="--show" commandFor="address-modal" onClick={prepareAdd}>Tambah alamat</s-button>
+            </s-stack>
           )}
         </s-section>
 
-        <s-section heading="Tambah alamat">
+        <s-modal id="address-modal" heading="Tambah alamat" size="large" onAfterHide={resetForm}>
+          {formError && <s-banner heading="Alamat belum tersimpan" tone="critical">{formError}</s-banner>}
           <s-form onSubmit={() => void onSubmit()}>
             <s-stack direction="block" gap="base">
               <s-text-field label="Label alamat" value={form.label} onInput={(event) => setField('label', eventValue(event))} required />
@@ -188,10 +235,13 @@ function Extension() {
               </s-select>
 
               <s-checkbox label="Jadikan alamat utama" checked={form.is_default} onChange={(event) => setField('is_default', eventChecked(event))} />
-              <s-button type="submit" variant="primary" loading={saving} disabled={!complete || saving}>Simpan alamat</s-button>
             </s-stack>
           </s-form>
-        </s-section>
+          <s-button slot="secondary-actions" command="--hide" commandFor="address-modal" disabled={saving}>Batal</s-button>
+          <s-button slot="primary-action" variant="primary" loading={saving} disabled={!complete || saving} onClick={() => void onSubmit()}>
+            Simpan alamat
+          </s-button>
+        </s-modal>
       </s-stack>
     </s-page>
   );
