@@ -1,0 +1,17 @@
+api_version = "2026-01"
+
+[[extensions]]
+name = "Dikado addresses"
+handle = "dikado-addresses"
+type = "ui_extension"
+uid = "d819a33e-e299-4bf4-b2f4-b2b12bad6c65"
+
+[[extensions.targeting]]
+module = "./src/AddressPage.jsx"
+target = "customer-account.page.render"
+
+[extensions.targeting.capabilities]
+allow_direct_linking = true
+
+[extensions.capabilities]
+network_access = true
