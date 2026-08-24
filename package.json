@@ -11,7 +11,8 @@
     "dev": "shopify app dev",
     "info": "shopify app info",
     "generate": "shopify app generate",
-    "deploy": "shopify app deploy"
+    "deploy": "shopify app deploy",
+    "register:carrier-service": "node scripts/register-carrier-service.mjs"
   },
   "dependencies": {},
   "trustedDependencies": [
