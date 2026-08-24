@@ -28,8 +28,10 @@ async function accessToken() {
   const payload = await response.json().catch(() => null);
   if (!response.ok || !payload?.access_token) throw new Error('Unable to authenticate with Shopify Admin API');
   const scopes = new Set(String(payload.scope || '').split(',').map((scope) => scope.trim()).filter(Boolean));
-  const missing = ['read_shipping', 'write_shipping'].filter((scope) => !scopes.has(scope));
-  if (missing.length) throw new Error(`The installed app has not granted ${missing.join(', ')}`);
+  // Shopify can return only the write scope in the client-credentials response.
+  // write_shipping also authorizes reading CarrierService resources, so requiring
+  // read_shipping separately rejects a token that is valid for this script.
+  if (!scopes.has('write_shipping')) throw new Error('The installed app has not granted write_shipping');
   return payload.access_token;
 }
 
