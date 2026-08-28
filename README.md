@@ -154,3 +154,63 @@ Shopify:
 - [Metaobjects](https://shopify.dev/docs/apps/custom-data/metaobjects)
 - [App extensions](https://shopify.dev/docs/apps/app-extensions/list)
 - [Shopify Functions](https://shopify.dev/docs/api/functions)
+
+## Dress-up element metafields
+
+The storefront already stores dress-up data as Shopify metaobjects. Do not create Product or Product Variant records for this feature:
+
+- `character_item` is the Accessories/element resource.
+- `character` is the compatible-character resource.
+- `character_pose` and `character_item_asset` retain the existing per-pose artwork mapping.
+
+The setup command creates constrained `METAOBJECT` metafield definitions for `character_item` entries. It never updates or deletes metafield values. It checks existing definitions first, so running it again reports `EXISTS` instead of creating duplicates.
+
+Required app scopes are `read_metaobject_definitions` and `write_metaobject_definitions`. They are declared in `shopify.app.toml`; deploy the configuration and update/reinstall the app on the development store so the new grants are present.
+
+### Installation
+
+1. Connect the Shopify app to a development store and deploy the updated app configuration if needed.
+2. Set `SHOPIFY_SHOP_DOMAIN`, `SHOPIFY_API_VERSION`, `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, and `SHOPIFY_ENV=development`. Do not commit their values.
+3. Preview the setup (read-only):
+
+   ```shell
+   npm run setup:element-metafields
+   ```
+
+4. Apply it to the development store:
+
+   ```shell
+   npm run setup:element-metafields -- --apply
+   ```
+
+5. Run the apply command a second time. All three lines should report `EXISTS`, with no duplicate-definition error.
+6. Deploy/restart the app or publish the updated theme as appropriate.
+7. In Shopify Admin, open **Settings → Custom data → Metaobjects → Character item** and verify:
+
+   - `custom.element_category`
+   - `custom.element_compatibility`
+   - `custom.compatible_character_ids`
+
+8. Populate sample Nature, Food, and Objects entries. Verify universal items appear for every character, character-specific items appear only for referenced characters, and an existing accessory such as a bow still appears and works.
+
+The command prints only action, qualified key, definition ID, and type. It never prints the access token or secret. A shop not explicitly marked `SHOPIFY_ENV=development` cannot be changed unless `--confirm-production` is also passed; only use that flag after explicit production approval.
+
+### Data examples
+
+Nature item:
+
+```text
+custom.element_category: nature
+custom.element_compatibility: universal
+custom.compatible_character_ids: empty
+```
+
+Existing bow:
+
+```text
+custom.element_category: accessories
+custom.element_compatibility: universal (or character-specific when existing behavior is restricted)
+custom.compatible_character_ids: empty for universal; select character metaobjects only when restricted
+```
+
+Legacy entries remain visible: missing category is treated as `accessories`, while missing compatibility preserves the existing pose-asset behavior.

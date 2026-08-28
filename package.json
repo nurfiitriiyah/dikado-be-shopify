@@ -12,7 +12,9 @@
     "info": "shopify app info",
     "generate": "shopify app generate",
     "deploy": "shopify app deploy",
-    "register:carrier-service": "node scripts/register-carrier-service.mjs"
+    "register:carrier-service": "node scripts/register-carrier-service.mjs",
+    "setup:element-metafields": "node scripts/setup-element-metafields.mjs",
+    "test:element-metafields": "node --test tests/setup-element-metafields.test.mjs"
   },
   "dependencies": {},
   "trustedDependencies": [

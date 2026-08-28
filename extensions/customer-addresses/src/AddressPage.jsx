@@ -1,7 +1,7 @@
 /** @jsxImportSource preact */
 import '@shopify/ui-extensions/preact';
 import {render} from 'preact';
-import {useEffect, useState} from 'preact/hooks';
+import {useEffect, useRef, useState} from 'preact/hooks';
 
 const API_BASE = 'https://bpefhxamltfxunxfvnwc.supabase.co/functions/v1/shopify-app-proxy/customer-account';
 
@@ -23,6 +23,7 @@ export default async () => {
 };
 
 function Extension() {
+  const modalRef = useRef(null);
   const [addresses, setAddresses] = useState([]);
   const [locations, setLocations] = useState({provinces: [], cities: [], districts: [], subdistricts: []});
   const [form, setForm] = useState(emptyForm);
@@ -133,8 +134,7 @@ function Extension() {
       setSuccess('Alamat berhasil disimpan.');
       resetForm();
       await loadAddresses();
-      const modal = document.getElementById('address-modal');
-      if (modal && 'hideOverlay' in modal && typeof modal.hideOverlay === 'function') modal.hideOverlay();
+      modalRef.current?.hideOverlay();
     } catch (requestError) {
       setFormError(errorMessage(requestError));
     } finally {
@@ -207,7 +207,7 @@ function Extension() {
           )}
         </s-section>
 
-        <s-modal id="address-modal" heading="Tambah alamat" size="large" onAfterHide={resetForm}>
+        <s-modal ref={modalRef} id="address-modal" heading="Tambah alamat" size="large" onAfterHide={resetForm}>
           {formError && <s-banner heading="Alamat belum tersimpan" tone="critical">{formError}</s-banner>}
           <s-form onSubmit={() => void onSubmit()}>
             <s-stack direction="block" gap="base">
