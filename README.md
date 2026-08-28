@@ -155,7 +155,7 @@ Shopify:
 - [App extensions](https://shopify.dev/docs/apps/app-extensions/list)
 - [Shopify Functions](https://shopify.dev/docs/api/functions)
 
-## Dress-up element metafields
+## Dress-up element fields
 
 The storefront already stores dress-up data as Shopify metaobjects. Do not create Product or Product Variant records for this feature:
 
@@ -163,7 +163,7 @@ The storefront already stores dress-up data as Shopify metaobjects. Do not creat
 - `character` is the compatible-character resource.
 - `character_pose` and `character_item_asset` retain the existing per-pose artwork mapping.
 
-The setup command creates constrained `METAOBJECT` metafield definitions for `character_item` entries. It never updates or deletes metafield values. It checks existing definitions first, so running it again reports `EXISTS` instead of creating duplicates.
+Shopify metaobjects are structured through their `MetaobjectDefinition`; `METAOBJECT` is not a valid metafield owner type. The setup command therefore reuses the existing `character_item.category` field and adds only the two missing fields to that same definition. It never updates or deletes entry values, and running it again reports `EXISTS` instead of creating duplicates.
 
 Required app scopes are `read_metaobject_definitions` and `write_metaobject_definitions`. They are declared in `shopify.app.toml`; deploy the configuration and update/reinstall the app on the development store so the new grants are present.
 
@@ -187,9 +187,9 @@ Required app scopes are `read_metaobject_definitions` and `write_metaobject_defi
 6. Deploy/restart the app or publish the updated theme as appropriate.
 7. In Shopify Admin, open **Settings → Custom data → Metaobjects → Character item** and verify:
 
-   - `custom.element_category`
-   - `custom.element_compatibility`
-   - `custom.compatible_character_ids`
+   - `category` (existing field, reused)
+   - `element_compatibility`
+   - `compatible_character_ids`
 
 8. Populate sample Nature, Food, and Objects entries. Verify universal items appear for every character, character-specific items appear only for referenced characters, and an existing accessory such as a bow still appears and works.
 
@@ -200,17 +200,17 @@ The command prints only action, qualified key, definition ID, and type. It never
 Nature item:
 
 ```text
-custom.element_category: nature
-custom.element_compatibility: universal
-custom.compatible_character_ids: empty
+category: nature
+element_compatibility: universal
+compatible_character_ids: empty
 ```
 
 Existing bow:
 
 ```text
-custom.element_category: accessories
-custom.element_compatibility: universal (or character-specific when existing behavior is restricted)
-custom.compatible_character_ids: empty for universal; select character metaobjects only when restricted
+category: accessories
+element_compatibility: universal (or character-specific when existing behavior is restricted)
+compatible_character_ids: empty for universal; select character metaobjects only when restricted
 ```
 
-Legacy entries remain visible: missing category is treated as `accessories`, while missing compatibility preserves the existing pose-asset behavior.
+Legacy entries remain visible: missing category is treated as `accessories`, while missing compatibility preserves the existing pose-asset behavior. An item explicitly marked `universal` is also pose-independent: its thumbnail is used as a general sticker on every pose, while an existing pose-specific `character_item_asset` takes precedence for that pose.
