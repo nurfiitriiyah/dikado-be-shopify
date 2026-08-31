@@ -2,8 +2,23 @@
 import '@shopify/ui-extensions/preact';
 import {render} from 'preact';
 import {useEffect, useRef, useState} from 'preact/hooks';
+import {FullScreenError, FullScreenLoader} from './PageStates.jsx';
 
 const API_BASE = 'https://bpefhxamltfxunxfvnwc.supabase.co/functions/v1/shopify-app-proxy/customer-account';
+const INITIAL_LOAD_TIMEOUT_MS = 15000;
+
+class RequestError extends Error {
+  status = 0;
+
+  /**
+   * @param {string} message
+   * @param {number} status
+   */
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
 
 const emptyForm = {
   label: '',
@@ -27,56 +42,136 @@ function Extension() {
   const [addresses, setAddresses] = useState([]);
   const [locations, setLocations] = useState({provinces: [], cities: [], districts: [], subdistricts: []});
   const [form, setForm] = useState(emptyForm);
-  const [loading, setLoading] = useState(true);
+  const [pageStatus, setPageStatus] = useState('loading');
+  const [initialLoadAttempt, setInitialLoadAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [defaultingId, setDefaultingId] = useState('');
   const [error, setError] = useState('');
+  const [pageError, setPageError] = useState('');
   const [formError, setFormError] = useState('');
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    Promise.all([loadAddresses(), loadLocations('provinces')])
-      .catch((requestError) => setError(errorMessage(requestError)))
-      .finally(() => setLoading(false));
-  }, []);
+    let disposed = false;
+    let timedOut = false;
+    let timeoutId = 0;
+    const controller = new AbortController();
+    setPageStatus('loading');
+    setPageError('');
+    setAddresses([]);
+    setLocations({provinces: [], cities: [], districts: [], subdistricts: []});
+
+    const timeout = /** @type {Promise<never>} */ (new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+        reject(new Error('Initial page request timed out.'));
+      }, INITIAL_LOAD_TIMEOUT_MS);
+    }));
+
+    const initialRequest = loadInitialData(controller.signal)
+      .then(({addresses: nextAddresses, provinces}) => {
+        if (disposed || timedOut) return;
+        setAddresses(nextAddresses);
+        setLocations({provinces, cities: [], districts: [], subdistricts: []});
+        setPageStatus('success');
+      });
+
+    Promise.race([initialRequest, timeout])
+      .catch((requestError) => {
+        if (disposed) return;
+        controller.abort();
+        console.error('[Dikado addresses] Initial page data failed.', requestError);
+        setPageError(
+          timedOut
+            ? 'Waktu memuat data terlalu lama. Periksa koneksi Anda lalu coba lagi.'
+            : requestError instanceof RequestError && requestError.status === 401
+              ? 'Sesi Anda tidak lagi aktif. Silakan masuk kembali lalu coba lagi.'
+              : 'Alamat belum dapat dimuat. Silakan coba lagi.',
+        );
+        setPageStatus('error');
+      })
+      .finally(() => clearTimeout(timeoutId));
+
+    return () => {
+      disposed = true;
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [initialLoadAttempt]);
 
   /**
    * @param {string} path
    * @param {RequestInit} [options]
+   * @param {string} [sessionToken]
    */
-  async function api(path, options = {}) {
-    const token = await shopify.sessionToken.get();
+  async function api(path, options, sessionToken = '') {
+    const token = sessionToken || await shopify.sessionToken.get();
     const response = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
+        ...options.headers,
       },
     });
     const payload = /** @type {{data?: unknown[], error?: string}} */ (
       await response.json().catch(() => ({}))
     );
-    if (!response.ok) throw new Error(payload.error || 'Permintaan gagal. Silakan coba lagi.');
+    if (!response.ok) {
+      throw new RequestError(payload.error || 'Permintaan gagal. Silakan coba lagi.', response.status);
+    }
     return payload;
   }
 
+  /**
+   * @param {string} [sessionToken]
+   * @param {AbortSignal} [signal]
+   */
+  async function fetchAddresses(sessionToken = '', signal = undefined) {
+    const payload = await api('/addresses', {signal}, sessionToken);
+    if (!Array.isArray(payload.data)) throw new Error('Invalid address response.');
+    return payload.data;
+  }
+
   async function loadAddresses() {
-    const payload = await api('/addresses');
-    setAddresses(Array.isArray(payload.data) ? payload.data : []);
+    setAddresses(await fetchAddresses());
   }
 
   /**
    * @param {'provinces' | 'cities' | 'districts' | 'subdistricts'} level
    * @param {string} [parentId]
+   * @param {string} [sessionToken]
+   * @param {AbortSignal} [signal]
    */
-  async function loadLocations(level, parentId = '') {
+  async function fetchLocations(level, parentId = '', sessionToken = '', signal = undefined) {
     const query = new URLSearchParams();
     if (level === 'cities') query.set('province_id', parentId);
     if (level === 'districts') query.set('city_id', parentId);
     if (level === 'subdistricts') query.set('district_id', parentId);
-    const payload = await api(`/locations/${level}${query.size ? `?${query}` : ''}`);
-    const values = Array.isArray(payload.data) ? payload.data : [];
+    const payload = await api(`/locations/${level}${query.size ? `?${query}` : ''}`, {signal}, sessionToken);
+    if (!Array.isArray(payload.data)) throw new Error('Invalid location response.');
+    return payload.data;
+  }
+
+  async function loadLocations(level, parentId = '') {
+    const values = await fetchLocations(level, parentId);
     setLocations((current) => ({...current, [level]: values}));
+  }
+
+  async function loadInitialData(signal) {
+    const sessionToken = await shopify.sessionToken.get();
+    if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+    const [nextAddresses, provinces] = await Promise.all([
+      fetchAddresses(sessionToken, signal),
+      fetchLocations('provinces', '', sessionToken, signal),
+    ]);
+    return {addresses: nextAddresses, provinces};
+  }
+
+  function retryInitialLoad() {
+    setPageStatus('loading');
+    setInitialLoadAttempt((attempt) => attempt + 1);
   }
 
   function setField(name, value) {
@@ -160,6 +255,14 @@ function Extension() {
   const complete = form.label && form.recipient_name && form.phone && form.address_line &&
     form.province_id && form.city_id && form.district_id && form.subdistrict_id;
 
+  if (pageStatus === 'loading') {
+    return <FullScreenLoader message="Memuat alamat…" />;
+  }
+
+  if (pageStatus === 'error') {
+    return <FullScreenError message={pageError} onRetry={retryInitialLoad} />;
+  }
+
   return (
     <s-page heading="Alamat Pengiriman" subheading="Kelola alamat Indonesia yang tervalidasi">
       <s-button slot="primary-action" variant="primary" command="--show" commandFor="address-modal" onClick={prepareAdd}>
@@ -170,9 +273,7 @@ function Extension() {
         {success && <s-banner heading="Berhasil" tone="success">{success}</s-banner>}
 
         <s-section heading="Alamat tersimpan">
-          {loading ? (
-            <s-spinner accessibilityLabel="Memuat alamat" />
-          ) : addresses.length ? (
+          {addresses.length ? (
             <s-stack direction="block" gap="base">
               {addresses.map((address) => (
                 <s-box key={address.id} padding="base" border="base" borderRadius="base">
