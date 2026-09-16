@@ -1,0 +1,14 @@
+api_version = "2026-01"
+
+[[extensions]]
+name = "Dikado payment status"
+handle = "dikado-payment-status"
+type = "ui_extension"
+uid = "48805474-fd8d-48a4-9908-0daff675ee5f"
+
+[[extensions.targeting]]
+module = "./src/PaymentPending.jsx"
+target = "customer-account.order-status.announcement.render"
+
+[extensions.capabilities]
+network_access = true

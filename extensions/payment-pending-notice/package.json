@@ -1,0 +1,10 @@
+{
+  "name": "payment-pending-notice",
+  "private": true,
+  "version": "1.0.0",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@shopify/ui-extensions": "~2026.1.0",
+    "preact": "^10.10.x"
+  }
+}
