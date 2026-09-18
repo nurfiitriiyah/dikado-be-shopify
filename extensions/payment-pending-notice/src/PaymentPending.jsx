@@ -11,13 +11,21 @@ export default async () => {
 
 function PaymentPendingNotice() {
   const [paymentPending, setPaymentPending] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
     loadPaymentStatus(controller.signal)
-      .then((result) => setPaymentPending(result.payment_pending === true))
+      .then(async (result) => {
+        const pending = result.payment_pending === true;
+        setPaymentPending(pending);
+        if (!pending) return;
+        if (result.payment_url) return setPaymentUrl(result.payment_url);
+        const prepared = await preparePayment(controller.signal);
+        if (prepared.payment_url) setPaymentUrl(prepared.payment_url);
+      })
       .catch((error) => {
-        if (error?.name !== 'AbortError') console.error('[Dikado payment status]', error);
+        if (error?.name !== 'AbortError') console.error('[Dikado payment status]', error?.message || 'Payment status unavailable');
       });
     return () => controller.abort();
   }, []);
@@ -28,6 +36,14 @@ function PaymentPendingNotice() {
     <s-announcement>
       <s-text>
         Menunggu pembayaran. Pesanan akan diproses setelah pembayaran berhasil.
+        {paymentUrl ? (
+          <>
+            {' '}
+            <s-link href={paymentUrl} target="_blank">
+              Lanjutkan pembayaran
+            </s-link>
+          </>
+        ) : null}
       </s-text>
     </s-announcement>
   );
@@ -35,12 +51,25 @@ function PaymentPendingNotice() {
 
 async function loadPaymentStatus(signal) {
   const token = await shopify.sessionToken.get();
-  const orderId = encodeURIComponent(shopify.order.value.id);
-  const response = await fetch(`${API_BASE}/orders/${orderId}/payment-status`, {
+  const query = new URLSearchParams({order_id: shopify.order.value.id});
+  const response = await fetch(`${API_BASE}/orders/payment-status?${query}`, {
     signal,
     headers: {Authorization: `Bearer ${token}`},
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || 'Unable to load payment status.');
+  return payload.data || {};
+}
+
+async function preparePayment(signal) {
+  const token = await shopify.sessionToken.get();
+  const response = await fetch(`${API_BASE}/orders/payment-resume`, {
+    method: 'POST',
+    signal,
+    headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'},
+    body: JSON.stringify({order_id: shopify.order.value.id}),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) return {};
   return payload.data || {};
 }
