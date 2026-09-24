@@ -12,6 +12,7 @@ export default async () => {
 function PaymentPendingNotice() {
   const [paymentPending, setPaymentPending] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState(null);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -20,22 +21,30 @@ function PaymentPendingNotice() {
         const pending = result.payment_pending === true;
         setPaymentPending(pending);
         if (!pending) return;
+        if (result.shopify_sync_pending === true) {
+          setMessage('Pembayaran diterima, status pesanan sedang diperbarui.');
+          return;
+        }
         if (result.payment_url) return setPaymentUrl(result.payment_url);
         const prepared = await preparePayment(controller.signal);
+        if (prepared.payment_completed === true) {
+          setPaymentPending(false);
+          setPaymentUrl(null);
+          return;
+        }
         if (prepared.payment_url) setPaymentUrl(prepared.payment_url);
       })
       .catch((error) => {
-        if (error?.name !== 'AbortError') console.error('[Dikado payment status]', error?.message || 'Payment status unavailable');
+        if (error?.name !== 'AbortError') setMessage(error?.message || 'Status pembayaran belum dapat dimuat.');
       });
     return () => controller.abort();
   }, []);
 
   if (!paymentPending) return null;
-
   return (
     <s-announcement>
       <s-text>
-        Menunggu pembayaran. Pesanan akan diproses setelah pembayaran berhasil.
+        {message || 'Menunggu pembayaran. Pesanan akan diproses setelah pembayaran berhasil.'}
         {paymentUrl ? (
           <>
             {' '}
@@ -70,6 +79,6 @@ async function preparePayment(signal) {
     body: JSON.stringify({order_id: shopify.order.value.id}),
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) return {};
+  if (!response.ok) throw new Error(payload.error || 'Pesanan ini tidak dapat dibayar dengan Midtrans.');
   return payload.data || {};
 }
