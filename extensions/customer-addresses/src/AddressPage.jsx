@@ -212,6 +212,10 @@ function Extension() {
   }
 
   async function onSubmit() {
+    if (!hasAtLeastTwoWords(form.recipient_name)) {
+      setFormError('Nama penerima harus terdiri dari minimal 2 kata, contoh: ALISA OK.');
+      return;
+    }
     setSaving(true);
     setFormError('');
     setSuccess('');
@@ -252,7 +256,11 @@ function Extension() {
     }
   }
 
-  const complete = form.label && form.recipient_name && form.phone && form.address_line &&
+  const recipientNameValid = hasAtLeastTwoWords(form.recipient_name);
+  const recipientNameError = form.recipient_name && !recipientNameValid
+    ? 'Masukkan minimal 2 kata, contoh: ALISA OK.'
+    : '';
+  const complete = form.label && recipientNameValid && form.phone && form.address_line &&
     form.province_id && form.city_id && form.district_id && form.subdistrict_id;
 
   if (pageStatus === 'loading') {
@@ -313,7 +321,7 @@ function Extension() {
           <s-form onSubmit={() => void onSubmit()}>
             <s-stack direction="block" gap="base">
               <s-text-field label="Label alamat" value={form.label} onInput={(event) => setField('label', eventValue(event))} required />
-              <s-text-field label="Nama penerima" value={form.recipient_name} onInput={(event) => setField('recipient_name', eventValue(event))} required />
+              <s-text-field label="Nama penerima" value={form.recipient_name} error={recipientNameError} onInput={(event) => setField('recipient_name', eventValue(event))} required />
               <s-phone-field label="Nomor telepon" value={form.phone} onInput={(event) => setField('phone', eventValue(event))} required />
               <s-text-area label="Alamat lengkap" value={form.address_line} onInput={(event) => setField('address_line', eventValue(event))} rows={3} required />
               <s-text-field label="Patokan (opsional)" value={form.direction} onInput={(event) => setField('direction', eventValue(event))} />
@@ -358,6 +366,11 @@ function eventValue(event) {
 function eventChecked(event) {
   const field = /** @type {{checked: boolean}} */ (event.currentTarget);
   return field.checked;
+}
+
+/** @param {string} value */
+function hasAtLeastTwoWords(value) {
+  return value.trim().split(/\s+/).filter(Boolean).length >= 2;
 }
 
 /** @param {unknown} error */

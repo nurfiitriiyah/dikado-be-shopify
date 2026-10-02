@@ -1,216 +1,166 @@
-# Shopify App Template - Extension Only
+# Dikado Shopify App and Customer Account Extensions
 
-This is a template for building a [Shopify app](https://shopify.dev/docs/apps/getting-started) using [Preact](https://preactjs.com/) and [Vite](https://vite.dev/). It uses Shopify's [Direct API access](https://shopify.dev/docs/api/app-home#direct-api-access) and [App Bridge](https://shopify.dev/docs/api/app-bridge) to make authenticated calls to the Shopify Admin API directly from the browser — no server required.
+This directory contains the Shopify app configuration used by Dikado, two Preact customer-account UI extensions, and administrative scripts for CarrierService and product element metafields. The storefront theme and Supabase backend live in the repository root; start with the [project README](../README.md) for the complete architecture and deployment order.
 
-Rather than cloning this repo, follow the [Quick Start steps](#quick-start) below.
+## Included components
 
-## Quick start
+| Path | Purpose |
+| --- | --- |
+| `shopify.app.toml` | App identity, scopes, API version, and App Proxy configuration |
+| `extensions/customer-addresses/` | Direct-linked customer-account address page |
+| `extensions/payment-pending-notice/` | Order-status notice and Midtrans payment-resume UI |
+| `scripts/register-carrier-service.mjs` | Idempotent CarrierService create/update script |
+| `scripts/setup-element-metafields.mjs` | Product compatibility and character-element definition setup |
+| `tests/setup-element-metafields.test.mjs` | Regression test for definition setup |
 
-### Prerequisites
+The app is extension-only and non-embedded. Sensitive business logic remains in the Supabase `shopify-app-proxy` Edge Function.
 
-Before you begin, you'll need to [download and install the Shopify CLI](https://shopify.dev/docs/apps/tools/cli/getting-started) if you haven't already.
+## Requirements
 
-### Setup
+- Node.js and npm (no Node version is pinned in this repository)
+- Shopify CLI authenticated to an authorized development store
+- Access to the correct Shopify app and store
+- A deployed or locally reachable Supabase Edge Function for extension API calls
+- Approved Shopify scopes and protected customer-data access where required
 
-```shell
-shopify app init --template=https://github.com/Shopify/shopify-app-template-extension-only
+Install the locked dependencies:
+
+```sh
+npm ci
 ```
 
-### Local Development
+## Development and validation
 
-```shell
-shopify app dev
+Start a Shopify development session:
+
+```sh
+npm run dev
 ```
 
-Press P to open the URL to your app. Once you click install, you can start development.
+Other repository-defined commands are:
 
-Local development is powered by [Shopify CLI](https://shopify.dev/docs/apps/build/cli-for-apps/test-apps-locally). It logs into your account, connects to an app, provides environment variables, updates remote config, creates a tunnel and provides commands to generate extensions.
-
-## How it works
-
-### Authentication
-
-This template uses [Shopify managed installation](https://shopify.dev/docs/apps/build/authentication-authorization/app-installation). Shopify handles the OAuth flow and app installation automatically. Once installed, the app is fully embedded in the Shopify Admin.
-
-### Querying data
-
-This template uses [Direct API access](https://shopify.dev/docs/api/app-home#direct-api-access) — the Shopify Admin API is called directly from the browser using App Bridge. No server-side code is needed.
-
-This template comes pre-configured with examples of querying data using GraphQL with direct API access, and using [metaobjects](https://shopify.dev/docs/apps/custom-data/metaobjects) to store and retrieve structured app data — see [/shared/models/faq.ts](./shared/models/faq.ts).
-
-### App Bridge
-
-[App Bridge](https://shopify.dev/docs/api/app-bridge) is loaded automatically in embedded apps.
-
-### Polaris Web Components
-
-This template uses [Polaris Web Components](https://shopify.dev/docs/api/app-home/web-components) — the native custom element version of Polaris that works in any framework (including Preact). No additional package installation is required as they are provided automatically in the Shopify Admin iframe.
-
-## GraphQL Codegen
-
-This template is pre-configured with [GraphQL Codegen](https://the-guild.dev/graphql/codegen) to generate TypeScript types from your GraphQL queries.
-
-To regenerate types after updating queries:
-
-```shell
-npm run codegen
-```
-
-To watch for changes:
-
-```shell
-npm run codegen:watch
-```
-
-## Build
-
-Build the app by running:
-
-Using npm:
-
-```shell
+```sh
 npm run build
+npm run info
+npm run generate
+npm run deploy
+npm run test:element-metafields
 ```
 
-Using yarn:
+Validate app configuration directly with Shopify CLI when needed:
 
-```shell
-yarn build
+```sh
+shopify app config validate --json
 ```
 
-Using pnpm:
+`npm run deploy` changes Shopify app configuration and extensions. Run it only for an explicitly approved target.
 
-```shell
-pnpm run build
+## Customer-account extensions
+
+### Dikado addresses
+
+`extensions/customer-addresses` renders a direct-linked customer-account page. It retrieves the RajaOngkir location hierarchy and stores validated customer addresses through direct `/customer-account/*` Edge Function routes. Requests use Shopify customer-account session tokens rather than storefront App Proxy signatures.
+
+The documented first version supports listing and inserting addresses. It does not yet replace Shopify's native address book or claim complete edit/delete synchronization. Setup and verification are in [Customer Account address page](../docs/customer-account-addresses.md).
+
+### Dikado payment status
+
+`extensions/payment-pending-notice` renders on the customer-account order-status page. It shows the current payment state and participates in the Midtrans payment-resume flow backed by the Edge Function. The root regression tests cover customer-account payment status and payment resume behavior.
+
+Both extensions declare network access. Keep all API credentials in Supabase; no server secret belongs in extension source or built assets.
+
+## Shopify App Proxy and scopes
+
+The app configuration exposes the storefront path `/apps/dikado-address`, which forwards signed requests to the Supabase Edge Function. The committed configuration requests customer, product, shipping, order, App Proxy, and metaobject-definition access required by the implemented routes and scripts.
+
+When scopes change:
+
+1. Validate the app configuration.
+2. Deploy it to the approved environment.
+3. Review and approve the changed permissions on the store.
+4. Verify the newly issued Admin API token contains the expected scopes before deploying dependent backend behavior.
+
+Do not place a static Admin access token in this repository. The backend uses the app credentials according to its server-side implementation.
+
+## Environment variables for administrative scripts
+
+Set values in the current shell or an approved secret manager. Do not commit a `.env` file containing real values.
+
+| Variable | Safe example | Used by |
+| --- | --- | --- |
+| `SHOPIFY_API_KEY` | `<SHOPIFY_API_KEY>` | Shopify authentication |
+| `SHOPIFY_API_SECRET` | `<SHOPIFY_API_SECRET>` | Shopify authentication |
+| `SHOPIFY_SHOP_DOMAIN` | `<SHOPIFY_STORE_DOMAIN>` | Target-store allowlist |
+| `SHOPIFY_API_VERSION` | `<SHOPIFY_API_VERSION>` | Admin API version |
+| `SUPABASE_URL` | `<SUPABASE_URL>` | Carrier callback base URL |
+| `SHOPIFY_CARRIER_CALLBACK_SECRET` | `<WEBHOOK_SECRET>` | Carrier callback protection |
+| `SHOPIFY_CARRIER_SERVICE_NAME` | `<CARRIER_SERVICE_NAME>` | Optional service name override |
+| `SHOPIFY_ENV` | `development` | Product-definition safety guard |
+
+The scripts may require only a subset of these variables; each script validates its own required inputs.
+
+## CarrierService registration
+
+Before registration, deploy the Edge Function, approve the app's shipping scopes, confirm the store is eligible for CarrierService, and configure a safe Shopify backup rate.
+
+```sh
+SHOPIFY_API_KEY='<SHOPIFY_API_KEY>' \
+SHOPIFY_API_SECRET='<SHOPIFY_API_SECRET>' \
+SHOPIFY_SHOP_DOMAIN='<SHOPIFY_STORE_DOMAIN>' \
+SHOPIFY_API_VERSION='<SHOPIFY_API_VERSION>' \
+SUPABASE_URL='<SUPABASE_URL>' \
+SHOPIFY_CARRIER_CALLBACK_SECRET='<WEBHOOK_SECRET>' \
+npm run register:carrier-service
 ```
 
-## Shopify Dev MCP
+The script queries existing services before creating or updating the named service. Registration does not configure the Shopify shipping profile or backup rate; complete those merchant-side steps separately. See [Dikado pre-checkout and native Shopify shipping](../docs/dikado-precheckout.md).
 
-This template is configured with the Shopify Dev MCP. This instructs [Cursor](https://cursor.com/), [GitHub Copilot](https://github.com/features/copilot), [Claude Code](https://claude.com/product/claude-code), and [Google Gemini CLI](https://github.com/google-gemini/gemini-cli) to use the Shopify Dev MCP.
+## Product compatibility and element metafields
 
-For more information on the Shopify Dev MCP please read [the documentation](https://shopify.dev/docs/apps/build/devmcp).
+Dress-up elements use the existing Shopify metaobject model (`character_item`, `character`, `character_pose`, and `character_item_asset`). The setup script reuses the existing `character_item.category` field and creates missing compatibility fields without modifying entry values.
 
-## Metafields and Metaobjects
+Preview the operation:
 
-This template uses [metaobjects](https://shopify.dev/docs/apps/custom-data/metaobjects) and [metafields](https://shopify.dev/docs/apps/custom-data/metafields) to store structured app data without a custom database.
-
-### Metaobject: FAQ
-
-The template defines a `faq` metaobject type for storing FAQ entries. Each FAQ has a question, answer, a flag to control visibility on the FAQ page, and optional product associations.
-
-Defined in `shopify.app.toml`:
-
-```toml
-[metaobjects.app.faq]
-name = "FAQ"
-
-[metaobjects.app.faq.fields.question]
-name = "Question"
-type = "single_line_text_field"
-required = true
-
-[metaobjects.app.faq.fields.answer]
-name = "Answer"
-type = "multi_line_text_field"
-required = true
-
-[metaobjects.app.faq.fields.show_on_faq_page]
-name = "Show on FAQ page"
-type = "boolean"
-
-[metaobjects.app.faq.fields.products]
-name = "Products"
-type = "list.product_reference"
+```sh
+SHOPIFY_ENV=development npm run setup:element-metafields
 ```
 
-### Metafield: Product FAQ
+Apply it to an approved development store:
 
-A metafield definition links individual products to a FAQ metaobject entry, allowing merchants to associate a FAQ with specific products.
-
-```toml
-[product.metafields.app.faq]
-name = "FAQ"
-description = "FAQ for this product"
-type = "metaobject_reference<$app:faq>"
-access.admin = "merchant_read_write"
+```sh
+SHOPIFY_ENV=development npm run setup:element-metafields -- --apply
 ```
 
-These definitions are automatically synced to Shopify when you run `shopify app dev` or `shopify app deploy`. See [/shared/models/faq.ts](./shared/models/faq.ts) for the client-side model that reads and writes these metaobjects via the Admin GraphQL API.
+Run the apply command again to confirm the operation is idempotent: existing definitions should be reported rather than duplicated. The script's production guard requires an explicit override; use it only after separate production approval.
 
-## Resources
+Expected fields on `character_item` are:
 
-Preact & Vite:
+- `category`
+- `element_compatibility`
+- `compatible_character_ids`
 
-- [Preact docs](https://preactjs.com/guide/v10/getting-started)
-- [Vite docs](https://vite.dev/)
+Missing legacy category data is treated by storefront code as accessories, while existing pose-specific assets retain precedence. Run `npm run test:element-metafields` after changing the setup script.
 
-Shopify:
+## Deployment
 
-- [Intro to Shopify apps](https://shopify.dev/docs/apps/getting-started)
-- [Direct API access](https://shopify.dev/docs/api/app-home#direct-api-access)
-- [Shopify CLI](https://shopify.dev/docs/apps/tools/cli)
-- [App Bridge](https://shopify.dev/docs/api/app-bridge)
-- [Polaris Web Components](https://shopify.dev/docs/api/app-home/web-components)
-- [Metaobjects](https://shopify.dev/docs/apps/custom-data/metaobjects)
-- [App extensions](https://shopify.dev/docs/apps/app-extensions/list)
-- [Shopify Functions](https://shopify.dev/docs/api/functions)
+Follow the repository-level [deployment sequence](../README.md#deployment-sequence). For this directory specifically:
 
-## Dress-up element fields
-
-The storefront already stores dress-up data as Shopify metaobjects. Do not create Product or Product Variant records for this feature:
-
-- `character_item` is the Accessories/element resource.
-- `character` is the compatible-character resource.
-- `character_pose` and `character_item_asset` retain the existing per-pose artwork mapping.
-
-Shopify metaobjects are structured through their `MetaobjectDefinition`; `METAOBJECT` is not a valid metafield owner type. The setup command therefore reuses the existing `character_item.category` field and adds only the two missing fields to that same definition. It never updates or deletes entry values, and running it again reports `EXISTS` instead of creating duplicates.
-
-Required app scopes are `read_metaobject_definitions` and `write_metaobject_definitions`. They are declared in `shopify.app.toml`; deploy the configuration and update/reinstall the app on the development store so the new grants are present.
-
-### Installation
-
-1. Connect the Shopify app to a development store and deploy the updated app configuration if needed.
-2. Set `SHOPIFY_SHOP_DOMAIN`, `SHOPIFY_API_VERSION`, `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, and `SHOPIFY_ENV=development`. Do not commit their values.
-3. Preview the setup (read-only):
-
-   ```shell
-   npm run setup:element-metafields
-   ```
-
-4. Apply it to the development store:
-
-   ```shell
-   npm run setup:element-metafields -- --apply
-   ```
-
-5. Run the apply command a second time. All three lines should report `EXISTS`, with no duplicate-definition error.
-6. Deploy/restart the app or publish the updated theme as appropriate.
-7. In Shopify Admin, open **Settings → Custom data → Metaobjects → Character item** and verify:
-
-   - `category` (existing field, reused)
-   - `element_compatibility`
-   - `compatible_character_ids`
-
-8. Populate sample Nature, Food, and Objects entries. Verify universal items appear for every character, character-specific items appear only for referenced characters, and an existing accessory such as a bow still appears and works.
-
-The command prints only action, qualified key, definition ID, and type. It never prints the access token or secret. A shop not explicitly marked `SHOPIFY_ENV=development` cannot be changed unless `--confirm-production` is also passed; only use that flag after explicit production approval.
-
-### Data examples
-
-Nature item:
-
-```text
-category: nature
-element_compatibility: universal
-compatible_character_ids: empty
+```sh
+npm ci
+npm run test:element-metafields
+npm run build
+shopify app config validate --json
+npm run deploy
 ```
 
-Existing bow:
+After deployment, approve scope changes, activate the customer-account extensions in Shopify Admin, and verify direct links, order-status rendering, CarrierService, webhooks, and payment resume against the intended environment.
 
-```text
-category: accessories
-element_compatibility: universal (or character-specific when existing behavior is restricted)
-compatible_character_ids: empty for universal; select character metaobjects only when restricted
-```
+## Security and troubleshooting
 
-Legacy entries remain visible: missing category is treated as `accessories`, while missing compatibility preserves the existing pose-asset behavior. An item explicitly marked `universal` is also pose-independent: its thumbnail is used as a general sticker on every pose, while an existing pose-specific `character_item_asset` takes precedence for that pose.
+- Never expose Shopify secrets, Supabase service-role keys, RajaOngkir keys, Midtrans keys, webhook secrets, or callback secrets in this directory.
+- Treat committed app identifiers and extension UIDs as configuration identifiers, not authentication credentials; still avoid copying environment-specific values into documentation examples.
+- If App Proxy calls fail, verify the deployed proxy URL, canonical shop domain, signature secret, and store installation.
+- If an extension receives `401`, verify session-token audience, app client ID, shop claim, customer subject, protected customer-data approval, and the backend route.
+- If CarrierService registration fails, verify plan eligibility, `read_shipping`/`write_shipping`, callback URL construction, and app installation scopes.
+- If element setup is rejected, verify the metaobject-definition scopes and that `SHOPIFY_ENV=development` is set for a development store.
+- Removing a credential from this README does not remove it from Git history. Revoke and rotate any credential that was ever committed.
