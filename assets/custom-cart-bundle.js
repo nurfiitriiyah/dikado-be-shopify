@@ -128,6 +128,7 @@
             '_design_id': designId,
             '_custom_group_id': designId,
             '_item_type': 'print_fee',
+            '_customization_type': properties._customization_type || 'screen_print',
             '_side': expectedFee.side,
             '_zone': expectedFee.zone,
             'Print side': expectedFee.side === 'back' ? 'Back' : 'Front',
@@ -164,7 +165,9 @@
       if (!addResponse.ok) throw new Error('Could not restore missing customization fees.');
     }
 
-    return { changed: additions.length > 0 || Object.keys(updates).length > 0 };
+    var changed = additions.length > 0 || Object.keys(updates).length > 0;
+    if (changed) document.dispatchEvent(new CustomEvent('dikado:cart-mutated'));
+    return { changed: changed };
   }
 
   async function removeDesign(designId, button) {
@@ -185,6 +188,7 @@
         body: JSON.stringify({ updates: updates })
       });
       if (!updateResponse.ok) throw new Error('Could not remove the custom item.');
+      document.dispatchEvent(new CustomEvent('dikado:cart-mutated'));
       window.location.reload();
     } catch (error) {
       console.error(error);
@@ -216,6 +220,7 @@
         body: JSON.stringify({ updates: updates })
       });
       if (!response.ok) throw new Error('Could not update custom bundle quantity.');
+      document.dispatchEvent(new CustomEvent('dikado:cart-mutated'));
       window.location.reload();
     } catch (error) {
       console.error(error);
@@ -258,7 +263,7 @@
         return;
       }
       form.dataset.bundleIntegrityChecked = 'true';
-      form.requestSubmit(submitter);
+      window.location.assign(window.DikadoPrecheckoutUrl || rootPath() + 'pages/checkout-dikado');
     } catch (error) {
       console.error(error);
       submitter.disabled = false;

@@ -147,16 +147,14 @@
       <template id="empty-cart-template">
         {{ empty_cart_drawer_content }}
       </template>
-      <button
-        class="header-actions__action button-unstyled{% if display_style == 'text' %} header-actions__text-style{% endif %}"
-        on:click="/open"
-        aria-haspopup="dialog"
+      <a
+        href="{{ routes.cart_url }}"
+        class="header-actions__action action__cart button-unstyled{% if display_style == 'text' %} header-actions__text-style{% endif %}"
         aria-label="{{ 'accessibility.cart' | t }}"
         aria-describedby="cart-bubble-text"
-        data-testid="cart-drawer-trigger"
       >
         {{ cart_icon }}
-      </button>
+      </a>
 
       <dialog
         ref="dialog"

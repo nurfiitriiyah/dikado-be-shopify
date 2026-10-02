@@ -133,6 +133,28 @@
       {% render 'quick-add-modal' %}
     {% endif %}
 
+    {% liquid
+      assign dikado_precheckout_page = pages['checkout-dikado']
+      if dikado_precheckout_page == blank
+        assign dikado_precheckout_page = pages['custom-chekout']
+      endif
+      assign dikado_precheckout_url = dikado_precheckout_page.url | default: '/pages/checkout-dikado'
+    %}
+    <script>
+      window.DikadoPrecheckoutUrl = {{ dikado_precheckout_url | json }};
+    </script>
+    {% if customer %}
+      <script>
+        window.DikadoCartSyncConfig = {
+          customerId: {{ customer.id | json }},
+          endpoint: {{ '/apps/dikado-address/cart-snapshot' | json }},
+          precheckoutUrl: {{ dikado_precheckout_url | json }},
+          attributeKeys: [],
+          syncNotes: true
+        };
+      </script>
+      <script src="{{ 'dikado-cart-sync.js' | asset_url }}" defer="defer"></script>
+    {% endif %}
     <script src="{{ 'cart-checkout-selection.js' | asset_url }}" defer="defer"></script>
     {% render 'hamper-modal' %}
   </body>

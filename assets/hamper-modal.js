@@ -2,6 +2,7 @@
   'use strict';
 
   var VALID_TYPES = ['mixable', 'food_only', 'solo'];
+  var CLEANUP_RELOAD_KEY = 'dikadoHamperCleanupReloaded';
 
   function rootPath() {
     return (window.Shopify && Shopify.routes && Shopify.routes.root) || '/';
@@ -38,18 +39,31 @@
       this.selected = new Set();
       this.ribbon = null;
       this.originalSubmitter = null;
-      this.bypassSubmitter = null;
       this.isProcessing = false;
+      this.promptOpening = false;
+      this.fullScreenLoader = this.querySelector('full-screen-loader');
 
       document.addEventListener('submit', this.onSubmit.bind(this), true);
       this.addEventListener('click', this.onClick.bind(this));
       this.addEventListener('change', this.onChange.bind(this));
       this.querySelector('[data-hamper-message]').addEventListener('input', this.onMessage.bind(this));
       this.dialog.addEventListener('cancel', this.close.bind(this));
+      window.addEventListener('pageshow', function () {
+        if (this.fullScreenLoader) this.fullScreenLoader.hide();
+      }.bind(this));
 
       // Packaging is temporary. If the customer refreshes or returns to the
       // cart from checkout, remove it and restore the normal cart state.
       if (/\/cart\/?$/.test(window.location.pathname)) {
+        // A cleanup-triggered reload must never start another cleanup cycle.
+        // Clear the marker now so a later, user-initiated visit can still
+        // recover any temporary hamper state that may be created afterwards.
+        try {
+          if (sessionStorage.getItem(CLEANUP_RELOAD_KEY) === 'true') {
+            sessionStorage.removeItem(CLEANUP_RELOAD_KEY);
+            return;
+          }
+        } catch (_) {}
         window.addEventListener('pageshow', this.cleanupTemporaryPackaging.bind(this));
         this.cleanupTemporaryPackaging();
       }
@@ -81,7 +95,21 @@
           delete properties._hamper_role;
           await post('cart/change.js', { id: item.key, quantity: item.quantity, properties: properties });
         }
+
+        // Confirm Shopify persisted every mutation before refreshing the page.
+        // If stale metadata remains, keep the current page usable and report
+        // the problem instead of entering an endless reload loop.
+        cart = await request('cart.js', { headers: { Accept: 'application/json' } });
+        var hasTemporaryHamperState = cart.items.some(function (cartItem) {
+          var properties = cartItem.properties || {};
+          return properties._hamper_role === 'packaging' || properties._hamper_role === 'item';
+        });
+        if (hasTemporaryHamperState) {
+          throw new Error('Temporary hamper state could not be cleared.');
+        }
+
         try { sessionStorage.removeItem('dikadoCheckoutSelection'); } catch (_) {}
+        try { sessionStorage.setItem(CLEANUP_RELOAD_KEY, 'true'); } catch (_) {}
         window.location.reload();
       } catch (error) {
         console.error('[Hamper] Could not remove temporary packaging.', error);
@@ -92,21 +120,29 @@
 
     async onSubmit(event) {
       var submitter = event.submitter;
-      if (!submitter || submitter.name !== 'checkout' || submitter === this.bypassSubmitter) return;
+      if (!submitter || submitter.name !== 'checkout') return;
       if (!event.target.matches('form[action*="/cart"], #cart-form')) return;
-      // Let the existing custom printing-fee integrity pass run first. It will
-      // resubmit the same form with this marker once parent/fee lines are safe.
-      if (event.target.dataset.bundleIntegrityChecked !== 'true' && event.target.querySelector('[data-custom-design-id]')) return;
       event.preventDefault();
       event.stopImmediatePropagation();
+      await this.openCheckoutPrompt(event.target, submitter);
+    }
+
+    async openCheckoutPrompt(form, submitter) {
       this.originalSubmitter = submitter;
-      this.originalForm = event.target;
+      this.originalForm = form;
+      if (this.promptOpening) return;
+      this.promptOpening = true;
+      this.setPromptError('');
       try {
         await this.loadCart();
         this.showPrompt();
       } catch (error) {
         console.error('[Hamper] Could not open checkout prompt.', error);
-        this.continueCheckout();
+        this.lines = [];
+        this.showPrompt();
+        this.setPromptError('Opsi hamper belum dapat dimuat. Tutup dialog lalu coba lagi, atau lanjutkan checkout normal.');
+      } finally {
+        this.promptOpening = false;
       }
     }
 
@@ -147,8 +183,17 @@
     showPrompt() {
       this.querySelector('[data-hamper-prompt]').hidden = false;
       this.querySelector('[data-hamper-configurator]').hidden = true;
-      this.dialog.showModal();
+      if (!this.dialog.open) this.dialog.showModal();
       this.querySelector('[data-hamper-normal]').focus();
+    }
+
+    setPromptError(message) {
+      var error = this.querySelector('[data-hamper-prompt-error]');
+      var configure = this.querySelector('[data-hamper-configure]');
+      if (!error || !configure) return;
+      error.textContent = message || '';
+      error.hidden = !message;
+      configure.disabled = Boolean(message);
     }
 
     close(event, preservePackaging) {
@@ -164,13 +209,22 @@
       var form = this.originalForm;
       var submitter = this.originalSubmitter;
       if (!form || !submitter) return;
+      if (this.fullScreenLoader) {
+        this.fullScreenLoader.showLoading(
+          'Bentar, kita siapin kadomu… 🎁',
+          'Sebentar lagi lanjut ke checkout!'
+        );
+      }
       try {
-        if (window.CartCheckoutSelection) await window.CartCheckoutSelection.prepare();
-        this.bypassSubmitter = submitter;
-        form.requestSubmit(submitter);
-        setTimeout(function () { this.bypassSubmitter = null; }.bind(this), 0);
+        if (window.CartCheckoutSelection) {
+          await window.CartCheckoutSelection.prepare();
+          window.CartCheckoutSelection.goToPrecheckout();
+        } else {
+          window.location.assign(window.DikadoPrecheckoutUrl || rootPath() + 'pages/checkout-dikado');
+        }
       } catch (error) {
         console.error('[Hamper] Could not prepare selected checkout.', error);
+        if (this.fullScreenLoader) this.fullScreenLoader.hide();
         this.showPrompt();
         this.showError(error.message || 'Produk checkout tidak dapat disiapkan. Silakan coba lagi.');
       }
@@ -248,7 +302,6 @@
         var reason = this.disabledReason(item, activeType);
         var designId = (item.properties || {})._design_id;
         var image = item.image ? '<img src="' + escapeHtml(item.image) + '" ' + (designId ? 'data-design-side="front" ' : '') + 'alt="" width="64" height="64">' : '<span class="hamper-modal__image-placeholder" aria-hidden="true"></span>';
-        if (designId) image = '<span data-custom-design-preview="' + escapeHtml(designId) + '">' + image + '<span data-design-fallback hidden>Design preview is temporarily unavailable.</span></span>';
         var variant = item.variant_title && item.variant_title !== 'Default Title' ? '<span>' + escapeHtml(item.variant_title) + '</span>' : '';
         var properties = this.visibleProperties(item).map(function (property) {
           var value = String(property[1]);

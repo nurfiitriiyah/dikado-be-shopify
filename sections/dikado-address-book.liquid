@@ -1,6 +1,20 @@
 {% if customer %}
+  {% assign address_book_loader_id = 'DikadoAddressBookLoader-' | append: section.id %}
+  {{ 'full-screen-loader.css' | asset_url | stylesheet_tag }}
+  <script src="{{ 'full-screen-loader.js' | asset_url }}" defer="defer"></script>
   <script type="module" src="{{ 'dikado-address-book.js' | asset_url }}"></script>
-  <dikado-address-book></dikado-address-book>
+  {% render 'full-screen-loader',
+    id: address_book_loader_id,
+    color_scheme: section.settings.color_scheme,
+    loading_text: 'Memuat alamat…',
+    loading_description: 'Sebentar ya, kita siapin alamatmu dulu 📍'
+  %}
+  <div id="DikadoAddressBookContent-{{ section.id }}" hidden>
+    <dikado-address-book
+      data-loader-id="{{ address_book_loader_id }}"
+      data-content-id="DikadoAddressBookContent-{{ section.id }}"
+    ></dikado-address-book>
+  </div>
 {% else %}
   <p><a href="{{ routes.account_login_url }}">Masuk</a> untuk mengelola alamat dan memilih pengiriman.</p>
 {% endif %}
@@ -12,4 +26,3 @@
   "presets": [{ "name": "Dikado address book" }]
 }
 {% endschema %}
-

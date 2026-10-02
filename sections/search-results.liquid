@@ -38,15 +38,23 @@
 
       {% capture children %}
         {% for product in products %}
-          <li
-            id="{{ section.id }}-{{ product.id }}"
-            class="product-grid__item product-grid__item--{{ forloop.index0 }}"
-            data-page="{{ paginate.current_page }}"
-            data-product-id="{{ product.id }}"
-            ref="cards[]"
-          >
-            {% content_for 'block', type: '_product-card', id: 'product-card', closest.product: product %}
-          </li>
+          {% liquid
+            assign is_hidden_addon = false
+            if product.tags contains 'hidden-addon' or product.handle == 'custom-printing-fee' or product.id == settings.hamper_packaging_product.id
+              assign is_hidden_addon = true
+            endif
+          %}
+          {% unless is_hidden_addon %}
+            <li
+              id="{{ section.id }}-{{ product.id }}"
+              class="product-grid__item product-grid__item--{{ forloop.index0 }}"
+              data-page="{{ paginate.current_page }}"
+              data-product-id="{{ product.id }}"
+              ref="cards[]"
+            >
+              {% content_for 'block', type: '_product-card', id: 'product-card', closest.product: product %}
+            </li>
+          {% endunless %}
         {% endfor %}
       {% endcapture %}
 

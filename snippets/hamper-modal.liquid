@@ -1,6 +1,8 @@
 {% comment %}Theme-level, single-hamper checkout configurator.{% endcomment %}
 {% if settings.hamper_enabled %}
+  {{ 'full-screen-loader.css' | asset_url | stylesheet_tag }}
   {{ 'hamper-modal.css' | asset_url | stylesheet_tag }}
+  <script src="{{ 'full-screen-loader.js' | asset_url }}" defer="defer"></script>
   <script src="{{ 'hamper-modal.js' | asset_url }}" defer="defer"></script>
 
   {% liquid
@@ -8,6 +10,12 @@
     assign packaging_variant = packaging_product.selected_or_first_available_variant
   %}
   <hamper-modal data-enabled="true">
+    {% render 'full-screen-loader',
+      id: 'DikadoHamperCheckoutLoader',
+      color_scheme: settings.popover_color_scheme,
+      start_hidden: true
+    %}
+
     <script type="application/json" data-hamper-config>
       {
         "box": {% if settings.hamper_box_base != blank %}{{ settings.hamper_box_base | image_url: width: 1200 | json }}{% else %}null{% endif %},
@@ -42,6 +50,7 @@
       <section data-hamper-prompt>
         <h2 id="HamperTitle">Make it a Hamper? 🎁</h2>
         <p>Turn selected products into a beautifully packed gift hamper.</p>
+        <p class="hamper-modal__error" data-hamper-prompt-error role="alert" hidden></p>
         <div class="hamper-modal__prompt-actions">
           <button type="button" class="button button-secondary" data-hamper-normal><span class="button-text">No, Checkout Normally</span></button>
           <button type="button" class="button" data-hamper-configure><span class="button-text">Yes, Make a Hamper</span></button>
@@ -50,8 +59,8 @@
 
       <section class="hamper-modal__config" data-hamper-configurator hidden>
         <header>
-          <h2>Customize your hamper</h2>
-          <p>Select compatible products and finish your gift.</p>
+          <h2>Fill it with good stuff</h2>
+          <p>Choose what goes in, then we’ll wrap it up nicely.</p>
         </header>
         <div class="hamper-modal__grid">
           <div class="hamper-modal__preview-panel">

@@ -6,14 +6,23 @@
 {% endcomment %}
 
 {{ 'custom-product-designer.css' | asset_url | stylesheet_tag }}
+{{ 'embroidery-design-builder.css' | asset_url | stylesheet_tag }}
 {{ 'bp-character-builder.css' | asset_url | stylesheet_tag }}
 <script src="{{ 'bp-character-builder.js' | asset_url }}" defer="defer"></script>
 <script src="{{ 'character-builder.js' | asset_url }}" defer="defer"></script>
 <script src="{{ 'frame-editor.js' | asset_url }}" defer="defer"></script>
 <script src="{{ 'custom-design-storage.js' | asset_url }}" defer="defer"></script>
+<script src="{{ 'embroidery-design-builder.js' | asset_url }}" defer="defer"></script>
 <script src="{{ 'custom-product-designer.js' | asset_url }}" defer="defer"></script>
 
 {% if product and product.metafields.custom.customizer_enabled.value == true %}
+  {% liquid
+    assign is_embroidery = false
+    if product.metafields.custom.custom_bordir.value == true
+      assign is_embroidery = true
+    endif
+  %}
+
   <script id="customizer-product-config-{{ section.id }}" type="application/json">
     {{ product.metafields.custom.customizer_config.value  | json }}
   </script>
@@ -24,6 +33,7 @@
       "handle": {{ product.handle | json }},
       "title": {{ product.title | json }},
       "productUrl": {{ product.url | json }},
+      "isEmbroidery": {{ is_embroidery | json }},
       "currency": {{ cart.currency.iso_code | default: shop.currency | json }},
       "featuredImage": {% if product.featured_image %}{{ product.featured_image | image_url: width: 2400 | json }}{% else %}null{% endif %},
       "variants": {
@@ -87,13 +97,94 @@
     }
   </script>
 
+  {% if is_embroidery %}
+    <script id="customizer-embroidery-templates-{{ section.id }}" type="application/json" data-embroidery-templates>
+      [
+        {% assign embroidery_template_started = false %}
+        {% assign product_embroidery_templates = product.metafields.custom.embroidery_templates.value %}
+        {% for embroidery_template in product_embroidery_templates %}
+          {% liquid
+            assign embroidery_template_active = embroidery_template.active.value
+            assign embroidery_template_id = embroidery_template.template_id.value | strip
+            assign embroidery_template_name = embroidery_template.name.value | strip
+            assign embroidery_template_layout = embroidery_template.layout.value | strip | downcase
+            assign embroidery_template_decoration = embroidery_template.decoration.value
+            assign embroidery_template_preview = embroidery_template.preview_image.value
+            assign embroidery_template_valid = false
+
+            if embroidery_template_active == true and embroidery_template_id != blank and embroidery_template_name != blank
+              case embroidery_template_layout
+                when 'text_only'
+                  assign embroidery_template_valid = true
+                when 'sulur', 'leaf', 'circle', 'rectangle'
+                  if embroidery_template_decoration != blank
+                    assign embroidery_template_valid = true
+                  endif
+              endcase
+            endif
+          %}
+          {% if embroidery_template_valid %}
+            {% if embroidery_template_started %},{% endif %}
+            {
+              "id": {{ embroidery_template_id | json }},
+              "label": {{ embroidery_template_name | json }},
+              "decorationUrl": {% if embroidery_template_decoration != blank %}{{ embroidery_template_decoration | image_url: width: 4000 | json }}{% else %}null{% endif %},
+              "previewImageUrl": {% if embroidery_template_preview != blank %}{{ embroidery_template_preview | image_url: width: 800 | json }}{% else %}null{% endif %},
+              "layout": {{ embroidery_template_layout | json }},
+              "fontFamily": {{ embroidery_template.font_family.value | json }},
+              "fontWeight": {{ embroidery_template.font_weight.value | json }},
+              "fontStyle": {{ embroidery_template.font_style.value | json }},
+              "decorationScale": {{ embroidery_template.decoration_scale.value | json }},
+              "colorMode": {{ embroidery_template.color_mode.value | json }},
+              "artboardWidth": {{ embroidery_template.artboard_width.value | json }},
+              "artboardHeight": {{ embroidery_template.artboard_height.value | json }},
+              "sortOrder": {{ embroidery_template.sort_order.value | json }}
+            }
+            {% assign embroidery_template_started = true %}
+          {% endif %}
+        {% endfor %}
+      ]
+    </script>
+  {% endif %}
+
+  <script type="application/json" data-customizer-stickers>
+    [
+      {% assign customizer_sticker_started = false %}
+      {% assign customizer_items = shop.metaobjects.character_item.values %}
+      {% assign customizer_assets = shop.metaobjects.character_item_asset.values %}
+      {% for item in customizer_items %}
+        {% assign customizer_compatibility = item.element_compatibility.value | default: item.metafields.custom.element_compatibility.value | downcase %}
+        {% if customizer_compatibility == 'universal' %}
+          {% assign customizer_sticker_image = item.thumbnail.value %}
+          {% for asset in customizer_assets %}
+            {% if asset.item.value.system.id == item.system.id and asset.pose.value == blank and asset.image.value != blank %}
+              {% assign customizer_sticker_image = asset.image.value %}
+              {% break %}
+            {% endif %}
+          {% endfor %}
+          {% if customizer_sticker_image != blank %}
+            {% if customizer_sticker_started %},{% endif %}
+            {
+              "id": {{ item.system.id | json }},
+              "name": {{ item.name.value | default: item.system.handle | json }},
+              "image": {{ customizer_sticker_image | image_url: width: 1400 | json }}
+            }
+            {% assign customizer_sticker_started = true %}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    ]
+  </script>
+
   <dialog
     id="CustomProductDesigner-{{ section.id }}"
-    class="customizer-dialog"
+    class="customizer-dialog{% if is_embroidery %} customizer-dialog--embroidery{% endif %}"
     data-custom-product-designer
+    data-customization-mode="{% if is_embroidery %}embroidery{% else %}screen_print{% endif %}"
     data-section-id="{{ section.id }}"
     data-config-script="customizer-product-config-{{ section.id }}"
     data-product-script="customizer-product-data-{{ section.id }}"
+    {% if is_embroidery %}data-embroidery-templates-script="customizer-embroidery-templates-{{ section.id }}"{% endif %}
     aria-labelledby="CustomizerTitle-{{ section.id }}"
   >
     {% render 'bp-character-builder-embedded' %}
@@ -107,15 +198,15 @@
     <div class="customizer-shell">
       <header class="customizer-header">
         <div>
-          <p class="customizer-eyebrow">Custom product</p>
+          <p class="customizer-eyebrow">{% if is_embroidery %}Custom Bordir{% else %}Custom product{% endif %}</p>
           <h2 id="CustomizerTitle-{{ section.id }}" class="customizer-title">{{ product.title | escape }}</h2>
-          <p class="customizer-step-label" data-customizer-step-label>Create character</p>
+          <p class="customizer-step-label" data-customizer-step-label>{% if is_embroidery %}Design Bordir{% else %}Create character{% endif %}</p>
         </div>
         <button type="button" class="customizer-icon-button" data-customizer-close aria-label="Close customizer">×</button>
       </header>
 
       <div class="customizer-body">
-        <section class="customizer-step is-active" data-step="character">
+        <section class="customizer-step{% unless is_embroidery %} is-active{% endunless %}" data-step="character" data-embroidery-unavailable{% if is_embroidery %} hidden aria-hidden="true"{% endif %}>
           <div class="customizer-centered-card">
             <span class="customizer-step-number">1</span>
             <h3>Create your character</h3>
@@ -140,45 +231,116 @@
           </div>
         </section>
 
+        <section class="customizer-step{% if is_embroidery %} is-active{% endif %}" data-step="embroidery"{% unless is_embroidery %} hidden aria-hidden="true"{% endunless %}>
+          <div class="embroidery-builder" data-embroidery-builder>
+            <div class="embroidery-builder__preview-panel">
+              <span class="customizer-step-number">1</span>
+              <h3>Design Bordir</h3>
+              <p>Buat tulisan Bordir, lalu atur posisi dan ukurannya pada langkah berikutnya.</p>
+              <div class="embroidery-builder__mockup" data-embroidery-mockup>
+                <img data-embroidery-mockup-image alt="Mockup produk untuk preview Bordir" width="1200" height="1200" />
+                <canvas data-embroidery-preview-canvas width="1200" height="1200" aria-label="Live preview desain Bordir"></canvas>
+              </div>
+              <p class="embroidery-builder__note">Preview desain. Posisi dan ukuran dapat disesuaikan pada langkah berikutnya.</p>
+            </div>
+
+            <div class="embroidery-builder__controls">
+              <label class="embroidery-builder__field" for="EmbroideryText-{{ section.id }}">
+                <span>Teks Bordir</span>
+                <span class="embroidery-builder__input-wrap">
+                  <input id="EmbroideryText-{{ section.id }}" type="text" inputmode="text" autocomplete="off" maxlength="12" data-embroidery-text aria-describedby="EmbroideryCounter-{{ section.id }} EmbroideryStatus-{{ section.id }}" />
+                  <output id="EmbroideryCounter-{{ section.id }}" data-embroidery-counter>0/12</output>
+                </span>
+              </label>
+
+              <fieldset class="embroidery-builder__fieldset">
+                <legend>Pilih template</legend>
+                <div class="embroidery-builder__templates" data-embroidery-templates></div>
+              </fieldset>
+
+              <fieldset class="embroidery-builder__fieldset">
+                <legend>Pilih warna benang</legend>
+                <div class="embroidery-builder__colors" data-embroidery-colors></div>
+              </fieldset>
+
+              <p id="EmbroideryStatus-{{ section.id }}" class="customizer-status" data-embroidery-status role="status"></p>
+              <button type="button" class="button embroidery-builder__confirm" data-embroidery-confirm>Pakai Desain Ini</button>
+            </div>
+          </div>
+        </section>
+
         <section class="customizer-step" data-step="zone">
           <div class="customizer-centered-card">
             <span class="customizer-step-number">2</span>
-            <h3>Choose print positions</h3>
-            <p>Select one or more print areas for the front surface.</p>
+            <h3>{% if is_embroidery %}Pilih posisi Bordir{% else %}Choose print positions{% endif %}</h3>
+            <p>{% if is_embroidery %}Pilih satu area Bordir untuk sisi depan.{% else %}Select one or more print areas for the front surface.{% endif %}</p>
             <div class="customizer-zone-options" data-zone-options></div>
             <p class="customizer-zone-selection-summary" data-zone-selection-summary aria-live="polite"></p>
             <div class="customizer-actions">
-              <button type="button" class="button button--secondary" data-back-to-character>Back</button>
-              <button type="button" class="button" data-zone-continue disabled>Design Front</button>
+              <button type="button" class="button button--secondary" data-back-to-character data-embroidery-unavailable{% if is_embroidery %} hidden disabled{% endif %}>Back</button>
+              <button type="button" class="button" data-zone-continue disabled>{% if is_embroidery %}Atur Bordir{% else %}Design Front{% endif %}</button>
             </div>
           </div>
         </section>
 
         <section class="customizer-step customizer-editor-step" data-step="editor">
           <div class="customizer-editor-layout">
-            <aside class="customizer-toolbar" aria-label="Design tools">
-              <button type="button" data-tool-character>
+            <aside class="customizer-toolbar" aria-label="{% if is_embroidery %}Alat desain Bordir{% else %}Design tools{% endif %}">
+              <button type="button" data-tool-character data-embroidery-unavailable{% if is_embroidery %} hidden disabled{% endif %}>
                 <span aria-hidden="true">☺</span>
                 My Character
               </button>
-              <button type="button" data-tool-text>
+              <button type="button" data-tool-stickers data-embroidery-unavailable{% if is_embroidery %} hidden disabled{% endif %}>
+                <span aria-hidden="true">✨</span>
+                Stickers
+              </button>
+              <button type="button" data-tool-text data-embroidery-unavailable{% if is_embroidery %} hidden disabled{% endif %}>
                 <span aria-hidden="true">T</span>
                 Add Text
               </button>
-              <button type="button" data-tool-upload>
+              <button type="button" data-tool-upload data-embroidery-unavailable{% if is_embroidery %} hidden disabled{% endif %}>
                 <span aria-hidden="true">↥</span>
                 Upload Image
               </button>
-              <button type="button" data-tool-frame>
+              <button type="button" data-tool-frame data-embroidery-unavailable{% if is_embroidery %} hidden disabled{% endif %}>
                 <span aria-hidden="true">▣</span>
                 Add Frame
+              </button>
+              <button
+                type="button"
+                data-tool-flip
+                data-embroidery-unavailable
+                title="Flip the selected image horizontally"
+                aria-label="Flip selected image horizontally"
+                disabled{% if is_embroidery %} hidden{% endif %}
+              >
+                <span aria-hidden="true">↔</span>
+                Flip
+              </button>
+              <button type="button" data-tool-edit-embroidery{% unless is_embroidery %} hidden disabled{% endunless %}>
+                <span aria-hidden="true">✎</span>
+                Edit Desain Bordir
               </button>
               <button type="button" data-tool-delete>
                 <span aria-hidden="true">⌫</span>
                 Delete
               </button>
-              <input type="file" accept="image/png,image/jpeg,image/webp" data-image-upload hidden />
+              <input type="file" accept="image/png,image/jpeg,image/webp" data-image-upload data-embroidery-unavailable hidden{% if is_embroidery %} disabled{% endif %} />
             </aside>
+
+            <div class="customizer-sticker-dialog" data-sticker-dialog data-embroidery-unavailable role="dialog" aria-modal="true" aria-labelledby="CustomizerStickerTitle-{{ section.id }}" hidden>
+              <div class="customizer-sticker-dialog-inner">
+                <div class="customizer-sticker-dialog-header">
+                  <div>
+                    <span>Sticker library</span>
+                    <h3 id="CustomizerStickerTitle-{{ section.id }}">Choose a sticker</h3>
+                  </div>
+                  <button type="button" class="customizer-icon-button" data-sticker-close aria-label="Close sticker library">×</button>
+                </div>
+                <div class="customizer-sticker-grid" data-sticker-grid></div>
+                <p class="customizer-sticker-empty" data-sticker-empty hidden>No universal stickers are available yet.</p>
+              </div>
+            </div>
 
             <div class="customizer-stage-panel">
               <div class="customizer-editor-topbar">
@@ -189,7 +351,7 @@
                 <div class="customizer-price-badge" data-editor-price></div>
               </div>
 
-              <div class="customizer-editor-zones" data-editor-zones aria-label="Selected print areas"></div>
+              <div class="customizer-editor-zones" data-editor-zones aria-label="{% if is_embroidery %}Area Bordir terpilih{% else %}Selected print areas{% endif %}"></div>
 
               <div class="customizer-canvas-wrap" data-canvas-wrap>
                 <canvas data-customizer-canvas></canvas>
@@ -199,10 +361,10 @@
                 </div>
               </div>
 
-              <div class="customizer-text-controls" data-text-controls hidden>
+              <div class="customizer-text-controls" data-text-controls data-embroidery-unavailable hidden>
                 <label>
                   Text
-                  <input type="text" data-text-value value="Your text" maxlength="120" />
+                  <input type="text" data-text-value value="Your text" maxlength="{% if is_embroidery %}12{% else %}120{% endif %}" />
                 </label>
                 <label>
                   Font
@@ -234,10 +396,10 @@
             <aside class="customizer-summary-card" data-live-summary>
               <h4>Price summary</h4>
               <div class="customizer-summary-row"><span>Product</span><strong data-price-product>—</strong></div>
-              <div class="customizer-summary-row"><span data-price-front-label>Front print</span><strong data-price-front>—</strong></div>
-              <div class="customizer-summary-row" data-price-back-row hidden><span data-price-back-label>Back print</span><strong data-price-back>—</strong></div>
+              <div class="customizer-summary-row"><span data-price-front-label>{% if is_embroidery %}Bordir depan{% else %}Front print{% endif %}</span><strong data-price-front>—</strong></div>
+              <div class="customizer-summary-row" data-price-back-row hidden><span data-price-back-label>{% if is_embroidery %}Bordir belakang{% else %}Back print{% endif %}</span><strong data-price-back>—</strong></div>
               <div class="customizer-summary-row customizer-summary-total"><span>Estimated total</span><strong data-price-total>—</strong></div>
-              <p class="customizer-small-note">Checkout price is controlled by Shopify product and printing-fee variants.</p>
+              <p class="customizer-small-note">{% if is_embroidery %}Harga checkout mengikuti produk Shopify dan variant biaya Bordir.{% else %}Checkout price is controlled by Shopify product and printing-fee variants.{% endif %}</p>
               <div class="customizer-btn">
                 <button type="button" class="button button--secondary" data-editor-back>Back</button>
                 <button type="button" class="button" data-editor-finish>Finish Front</button>
@@ -249,19 +411,19 @@
         <section class="customizer-step" data-step="back-choice">
           <div class="customizer-centered-card">
             <span class="customizer-step-number">4</span>
-            <h3>Front design is ready</h3>
+            <h3>{% if is_embroidery %}Desain Bordir depan siap{% else %}Front design is ready{% endif %}</h3>
             <div class="customizer-finished-preview">
               <img data-front-finished-preview alt="Front design preview" width="720" height="720" />
             </div>
             <p data-back-price-message></p>
             <div class="customizer-choice-grid">
               <button type="button" class="customizer-choice-card" data-front-only>
-                <strong>Continue Front Only</strong>
-                <span>No extra back printing fee.</span>
+                <strong data-front-only-label>Continue Front Only</strong>
+                <span>{% if is_embroidery %}Tanpa biaya Bordir belakang tambahan.{% else %}No extra back printing fee.{% endif %}</span>
               </button>
               <button type="button" class="customizer-choice-card" data-add-back>
-                <strong>Add Back Print</strong>
-                <span data-back-choice-description>The configured back print fee will be added.</span>
+                <strong>{% if is_embroidery %}Tambah Bordir Belakang{% else %}Add Back Print{% endif %}</strong>
+                <span data-back-choice-description>{% if is_embroidery %}Biaya Bordir belakang yang dikonfigurasi akan ditambahkan.{% else %}The configured back print fee will be added.{% endif %}</span>
               </button>
             </div>
             <p class="customizer-status" data-customizer-status role="status"></p>
@@ -271,16 +433,16 @@
         <section class="customizer-step" data-step="back-mode">
           <div class="customizer-centered-card">
             <span class="customizer-step-number">5</span>
-            <h3>Design the back</h3>
-            <p>Reuse the flattened front artwork or create a different back design.</p>
+            <h3>{% if is_embroidery %}Desain Bordir belakang{% else %}Design the back{% endif %}</h3>
+            <p>{% if is_embroidery %}Gunakan ulang desain Bordir depan atau buat desain teks yang berbeda untuk belakang.{% else %}Reuse the flattened front artwork or create a different back design.{% endif %}</p>
             <div class="customizer-choice-grid">
               <button type="button" class="customizer-choice-card" data-back-same>
-                <strong>Use Same Design as Front</strong>
-                <span>Copy all Front print areas to the matching Back positions. The Back design will be identical and cannot be edited.</span>
+                <strong>{% if is_embroidery %}Gunakan Bordir yang Sama dengan Depan{% else %}Use Same Design as Front{% endif %}</strong>
+                <span>{% if is_embroidery %}Salin desain Bordir depan ke posisi belakang yang sesuai. Desain belakang akan identik dan tidak dapat diedit.{% else %}Copy all Front print areas to the matching Back positions. The Back design will be identical and cannot be edited.{% endif %}</span>
               </button>
               <button type="button" class="customizer-choice-card" data-back-different>
-                <strong>Create Different Back Design</strong>
-                <span>Choose one or more Back print positions, then create a separate Back design.</span>
+                <strong>{% if is_embroidery %}Buat Bordir Belakang yang Berbeda{% else %}Create Different Back Design{% endif %}</strong>
+                <span>{% if is_embroidery %}Buat desain Bordir terpisah, lalu pilih satu posisi belakang.{% else %}Choose one or more Back print positions, then create a separate Back design.{% endif %}</span>
               </button>
             </div>
             <div class="customizer-actions">
@@ -293,13 +455,13 @@
         <section class="customizer-step" data-step="back-zone">
           <div class="customizer-centered-card">
             <span class="customizer-step-number">5</span>
-            <h3>Choose back print positions</h3>
-            <p>Select one or more print areas for the back surface.</p>
+            <h3>{% if is_embroidery %}Pilih posisi Bordir belakang{% else %}Choose back print positions{% endif %}</h3>
+            <p>{% if is_embroidery %}Pilih satu area Bordir untuk sisi belakang.{% else %}Select one or more print areas for the back surface.{% endif %}</p>
             <div class="customizer-zone-options" data-back-zone-options></div>
             <p class="customizer-zone-selection-summary" data-back-zone-selection-summary aria-live="polite"></p>
             <div class="customizer-actions">
               <button type="button" class="button button--secondary" data-back-zone-mode>Back</button>
-              <button type="button" class="button" data-back-zone-continue disabled>Design Back</button>
+              <button type="button" class="button" data-back-zone-continue disabled>{% if is_embroidery %}Desain Bordir Belakang{% else %}Design Back{% endif %}</button>
             </div>
             <p class="customizer-status" data-customizer-status role="status"></p>
           </div>
@@ -309,8 +471,8 @@
           <div class="customizer-review-layout">
             <div>
               <span class="customizer-step-number">6</span>
-              <h3>Review your custom product</h3>
-              <p>These previews include the actual Shopify product mockup. Production PNGs are transparent artwork only.</p>
+              <h3>{% if is_embroidery %}Review produk Bordir Anda{% else %}Review your custom product{% endif %}</h3>
+              <p>{% if is_embroidery %}Preview ini menggunakan mockup produk Shopify. PNG produksi hanya berisi artwork Bordir transparan.{% else %}These previews include the actual Shopify product mockup. Production PNGs are transparent artwork only.{% endif %}</p>
               <div class="customizer-review-previews">
                 <figure>
                   <img data-review-front alt="Front product preview" width="900" height="900" />
@@ -325,10 +487,15 @@
             <aside class="customizer-review-summary">
               <h4>Order summary</h4>
               <div class="customizer-summary-row"><span>Product</span><strong data-review-product-price>—</strong></div>
-              <div class="customizer-summary-row"><span data-review-front-label>Front print</span><strong data-review-front-price>—</strong></div>
-              <div class="customizer-summary-row" data-review-back-price-row hidden><span data-review-back-label>Back print</span><strong data-review-back-price>—</strong></div>
+              <div class="customizer-summary-row"><span data-review-front-label>{% if is_embroidery %}Bordir depan{% else %}Front print{% endif %}</span><strong data-review-front-price>—</strong></div>
+              <div class="customizer-summary-row" data-review-back-price-row hidden><span data-review-back-label>{% if is_embroidery %}Bordir belakang{% else %}Back print{% endif %}</span><strong data-review-back-price>—</strong></div>
+              <div class="embroidery-review-details" data-embroidery-review-details{% unless is_embroidery %} hidden{% endunless %}>
+                <div><span>Embroidery text</span><strong data-review-embroidery-text>—</strong></div>
+                <div><span>Embroidery template</span><strong data-review-embroidery-template>—</strong></div>
+                <div><span>Embroidery color</span><strong data-review-embroidery-color>—</strong></div>
+              </div>
               <div class="customizer-summary-row customizer-summary-total"><span>Estimated total</span><strong data-review-total>—</strong></div>
-              <button type="button" class="button customizer-add-cart" data-add-to-cart>Add Custom Product to Cart</button>
+              <button type="button" class="button customizer-add-cart" data-add-to-cart>{% if is_embroidery %}Tambahkan Produk Bordir ke Keranjang{% else %}Add Custom Product to Cart{% endif %}</button>
               <button type="button" class="button button--secondary" data-review-back-edit>Back</button>
               <p class="customizer-status" data-customizer-status role="status"></p>
             </aside>

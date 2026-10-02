@@ -10,8 +10,8 @@
 {
   "current": {
     "hamper_packaging_product": "packaging",
-    "hamper_box_base": "shopify://shop_images/Screenshot_2026-08-06_at_20.00.41.png",
-    "hamper_ribbon_pink": "shopify://shop_images/bow.png",
+    "hamper_box_base": "shopify://shop_images/5d558a80-8a69-4ada-a4f6-261fe2de22d6.png",
+    "hamper_ribbon_pink": "shopify://shop_images/ribbon_bibi1.png",
     "hamper_ribbon_purple": "shopify://shop_images/bow.png",
     "hamper_ribbon_red": "shopify://shop_images/bow.png",
     "hamper_ribbon_navy": "shopify://shop_images/bow.png",
@@ -50,7 +50,7 @@
     "type_font_h6": "subheading",
     "type_size_h6": "12",
     "type_line_height_h6": "display-loose",
-    "page_width": "narrow",
+    "page_width": "normal",
     "page_transition_enabled": true,
     "transition_to_main_product": false,
     "card_hover_effect": "none",
@@ -89,6 +89,18 @@
     "variant_button_radius": 14,
     "variant_button_width": "equal-width-buttons",
     "content_for_index": [],
+    "blocks": {
+      "14060646107696862457": {
+        "type": "shopify://apps/judge-me-reviews/blocks/judgeme_core/61ccd3b1-a9f2-4160-9fe9-4fec8413e5d8",
+        "disabled": false,
+        "settings": {}
+      },
+      "11348531219507317188": {
+        "type": "shopify://apps/eb-easy-bundle-builder/blocks/app-embed/05b1325c-6303-4da5-8e2f-b13ab2a50e1a",
+        "disabled": false,
+        "settings": {}
+      }
+    },
     "color_schemes": {
       "scheme-1": {
         "settings": {
@@ -400,6 +412,45 @@
           "selected_variant_hover_background_color": "#c92f63",
           "selected_variant_hover_text_color": "#ffffff",
           "selected_variant_hover_border_color": "#c92f63"
+        }
+      },
+      "scheme-4c977666-4026-4027-86df-97b4215495ca": {
+        "settings": {
+          "background": "#ffffff",
+          "foreground_heading": "#000000",
+          "foreground": "#000000cf",
+          "primary": "#000000cf",
+          "primary_hover": "#000000",
+          "border": "#0000000f",
+          "shadow": "#000000",
+          "primary_button_background": "#000000",
+          "primary_button_text": "#ffffff",
+          "primary_button_border": "#000000",
+          "primary_button_hover_background": "#333333",
+          "primary_button_hover_text": "#ffffff",
+          "primary_button_hover_border": "#000000",
+          "secondary_button_background": "rgba(0,0,0,0)",
+          "secondary_button_text": "#000000",
+          "secondary_button_border": "#000000",
+          "secondary_button_hover_background": "#fafafa",
+          "secondary_button_hover_text": "#333333",
+          "secondary_button_hover_border": "#333333",
+          "input_background": "#ffffffc7",
+          "input_text_color": "#333333",
+          "input_border_color": "#dfdfdf",
+          "input_hover_background": "#00000003",
+          "variant_background_color": "#ffffff",
+          "variant_text_color": "#000000",
+          "variant_border_color": "#00000021",
+          "variant_hover_background_color": "#f5f5f5",
+          "variant_hover_text_color": "#000000",
+          "variant_hover_border_color": "#e6e6e6",
+          "selected_variant_background_color": "#000000",
+          "selected_variant_text_color": "#ffffff",
+          "selected_variant_border_color": "#000000",
+          "selected_variant_hover_background_color": "#1a1a1a",
+          "selected_variant_hover_text_color": "#ffffff",
+          "selected_variant_hover_border_color": "#1a1a1a"
         }
       }
     }

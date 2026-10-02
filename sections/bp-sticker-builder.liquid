@@ -9,6 +9,7 @@
               base_image, thumbnail
   - character_item
       fields: name, category, thumbnail
+      fields: element_compatibility, compatible_character_ids
   - character_item_asset
       fields: item (metaobject reference -> character_item),
               pose (metaobject reference -> character_pose),
@@ -115,28 +116,54 @@
         </button>
       </div>
 
+      <div class="bp-builder-mode-tabs" role="tablist" aria-label="Dress-up tools">
+        <button type="button" class="bp-builder-mode-tab is-active" data-bp-mode="stickers" role="tab" aria-selected="true">Stickers</button>
+        <button type="button" class="bp-builder-mode-tab" data-bp-mode="draw" role="tab" aria-selected="false">Draw</button>
+        <button type="button" class="bp-builder-mode-tab" data-bp-mode="text" role="tab" aria-selected="false">Text</button>
+      </div>
+
       <div class="bp-builder-workspace">
+
         <!-- LEFT: CATEGORY -->
         <aside class="bp-builder-category-panel" aria-label="Sticker categories">
-          <p class="bp-builder-panel-label">Categories</p>
-          <div class="bp-builder-category-list" data-bp-category-list></div>
+          <div data-bp-sticker-panel>
+            <p class="bp-builder-panel-label">Categories</p>
+            <div class="bp-builder-category-list" data-bp-category-list></div>
+          </div>
         </aside>
 
         <!-- CENTER: ITEM LIBRARY -->
         <section class="bp-builder-library-panel">
-          <div class="bp-builder-panel-heading">
-            <div>
-              <p class="bp-builder-panel-label">Sticker library</p>
-              <h3 class="bp-builder-panel-title" data-bp-library-title>Outfit</h3>
+          <div data-bp-sticker-panel>
+            <div class="bp-builder-panel-heading">
+              <div>
+                <p class="bp-builder-panel-label">Sticker library</p>
+                <h3 class="bp-builder-panel-title" data-bp-library-title>Outfit</h3>
+              </div>
+              <span class="bp-builder-item-count" data-bp-item-count>0 items</span>
             </div>
-            <span class="bp-builder-item-count" data-bp-item-count>0 items</span>
+
+            <div class="bp-builder-item-grid" data-bp-item-grid></div>
+
+            <div class="bp-builder-empty-state" data-bp-empty-state hidden>
+              <span class="bp-builder-empty-emoji" aria-hidden="true">✨</span>
+              <p data-bp-empty-copy>No items for this pose yet ✨</p>
+            </div>
           </div>
 
-          <div class="bp-builder-item-grid" data-bp-item-grid></div>
+          <div class="bp-builder-creative-panel" data-bp-draw-panel hidden>
+            <p class="bp-builder-panel-label">Drawing tools</p>
+            <label>Color <input type="color" value="#8B5CF6" data-bp-draw-color></label>
+            <label>Brush size <input type="range" min="1" max="30" value="8" data-bp-brush-size></label>
+            <button type="button" class="bp-builder-tool-option" data-bp-eraser aria-pressed="false">Eraser</button>
+            <button type="button" class="bp-builder-tool-option" data-bp-clear-drawing>Clear drawing</button>
+          </div>
 
-          <div class="bp-builder-empty-state" data-bp-empty-state hidden>
-            <span class="bp-builder-empty-emoji" aria-hidden="true">✨</span>
-            <p data-bp-empty-copy>No items for this pose yet ✨</p>
+          <div class="bp-builder-creative-panel" data-bp-text-panel hidden>
+            <p class="bp-builder-panel-label">Insert text</p>
+            <label>Color <input type="color" value="#241E30" data-bp-text-color></label>
+            <label>Size <input type="range" min="16" max="96" value="42" data-bp-text-size></label>
+            <button type="button" class="bp-builder-primary-btn" data-bp-add-text>Add text</button>
           </div>
         </section>
 
@@ -155,6 +182,15 @@
               <button type="button" class="bp-builder-tool-btn" data-bp-reset title="Reset">
                 ↺ <span>Reset</span>
               </button>
+              <button type="button" class="bp-builder-tool-btn" data-bp-flip-horizontal title="Flip selected item horizontally" aria-label="Flip selected item horizontally" disabled>
+                ↔ <span>Flip H</span>
+              </button>
+              <button type="button" class="bp-builder-tool-btn" data-bp-flip-vertical title="Flip selected item vertically" aria-label="Flip selected item vertically" disabled>
+                ↕ <span>Flip V</span>
+              </button>
+              <button type="button" class="bp-builder-tool-btn bp-builder-expand-btn" data-bp-expand-canvas title="Expand canvas" aria-label="Expand canvas" aria-pressed="false">
+                <span class="bp-builder-expand-icon" aria-hidden="true">⛶</span> <span data-bp-expand-label>Expand Canvas</span>
+              </button>
             </div>
           </div>
 
@@ -172,6 +208,7 @@
                 draggable="false"
               >
 
+              <canvas class="bp-builder-drawing-layer" data-bp-drawing-layer aria-label="Drawing layer"></canvas>
               <div class="bp-builder-sticker-layer" data-bp-sticker-layer></div>
             </div>
           </div>
@@ -179,6 +216,7 @@
           <p class="bp-builder-mobile-help">
             Drag stickers to move them. Use the corner handle to resize and the round handle to rotate.
           </p>
+          
         </section>
       </div>
 
@@ -225,11 +263,22 @@
     [
       {% assign bp_items = shop.metaobjects.character_item.values %}
       {% for item in bp_items %}
+        {% liquid
+          assign bp_item_category = item.category.value | default: item.metafields.custom.element_category.value | default: 'accessories'
+          assign bp_item_compatibility = item.element_compatibility.value | default: item.metafields.custom.element_compatibility.value
+          assign bp_compatible_characters = item.compatible_characters.value | default: item.metafields.custom.compatible_character_ids.value
+        %}
         {
           "id": {{ item.system.id | json }},
           "handle": {{ item.system.handle | json }},
           "name": {{ item.name.value | default: item.system.handle | json }},
-          "category": {{ item.category.value | default: 'Extras' | json }},
+          "category": {{ bp_item_category | json }},
+          "compatibility": {{ bp_item_compatibility | json }},
+          "compatibleCharacterIds": [
+            {% for compatible_character in bp_compatible_characters %}
+              {{ compatible_character.system.id | json }}{% unless forloop.last %},{% endunless %}
+            {% endfor %}
+          ],
           "thumbnail": {% if item.thumbnail.value %}{{ item.thumbnail.value | image_url: width: 700 | json }}{% else %}null{% endif %}
         }{% unless forloop.last %},{% endunless %}
       {% endfor %}
@@ -579,6 +628,24 @@
       box-shadow: var(--bp-shadow);
     }
 
+    #bp-builder-{{ section.id }} .bp-builder-mode-tabs { display: flex; gap: 8px; width: fit-content; margin: 0 auto 14px; padding: 5px; border: 1px solid var(--bp-border); border-radius: 999px; background: rgba(255,255,255,.9); box-shadow: var(--bp-shadow-soft); }
+    #bp-builder-{{ section.id }} .bp-builder-mode-tab,
+    #bp-builder-{{ section.id }} .bp-builder-tool-option { border: 1px solid var(--bp-border); border-radius: 999px; background: white; color: var(--bp-text); padding: 9px 15px; cursor: pointer; font-weight: 750; }
+    #bp-builder-{{ section.id }} .bp-builder-mode-tab { min-width: 92px; border-color: transparent; }
+    #bp-builder-{{ section.id }} .bp-builder-mode-tab.is-active { border-color: var(--bp-accent); background: var(--bp-accent); color: white; }
+    #bp-builder-{{ section.id }} .bp-builder-tool-option[aria-pressed="true"] { border-color: var(--bp-accent); background: var(--bp-accent-soft); color: var(--bp-accent); }
+    #bp-builder-{{ section.id }}.bp-builder-mode--draw .bp-builder-category-panel,
+    #bp-builder-{{ section.id }}.bp-builder-mode--text .bp-builder-category-panel { display: none; }
+    #bp-builder-{{ section.id }}.bp-builder-mode--draw .bp-builder-library-panel,
+    #bp-builder-{{ section.id }}.bp-builder-mode--text .bp-builder-library-panel { grid-column: 1 / 3; }
+    #bp-builder-{{ section.id }} .bp-builder-creative-panel { padding: 4px 0; }
+    #bp-builder-{{ section.id }} .bp-builder-creative-panel[hidden] { display: none; }
+    #bp-builder-{{ section.id }} .bp-builder-creative-panel label { display: grid; gap: 7px; margin-bottom: 16px; font-weight: 750; }
+    #bp-builder-{{ section.id }} .bp-builder-creative-panel input[type="text"] { min-height: 44px; border: 1px solid var(--bp-border); border-radius: 12px; padding: 8px 11px; }
+    #bp-builder-{{ section.id }} .bp-builder-creative-panel input[type="range"] { width: 100%; accent-color: var(--bp-accent); }
+    #bp-builder-{{ section.id }} .bp-builder-creative-panel input[type="color"] { width: 54px; height: 38px; padding: 2px; border: 1px solid var(--bp-border); border-radius: 10px; }
+    #bp-builder-{{ section.id }} .bp-builder-creative-panel .bp-builder-tool-option { margin: 0 6px 8px 0; }
+
     #bp-builder-{{ section.id }} .bp-builder-category-panel,
     #bp-builder-{{ section.id }} .bp-builder-library-panel {
       border-right: 1px solid var(--bp-border);
@@ -819,6 +886,12 @@
       pointer-events: none;
     }
 
+    #bp-builder-{{ section.id }} .bp-builder-drawing-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    #bp-builder-{{ section.id }} .bp-builder-canvas.is-drawing .bp-builder-drawing-layer { pointer-events: auto; cursor: crosshair; touch-action: none; }
+    #bp-builder-{{ section.id }} .bp-builder-canvas.is-drawing .bp-builder-sticker-layer { pointer-events: none; }
+    #bp-builder-{{ section.id }} .bp-builder-sticker--text { width: auto; min-width: 80px; height: auto; min-height: 42px; aspect-ratio: auto; white-space: nowrap; font-family: Arial, sans-serif; font-weight: 700; line-height: 1.1; }
+    #bp-builder-{{ section.id }} .bp-builder-sticker--text .bp-builder-text-content { pointer-events: none; }
+
     #bp-builder-{{ section.id }} .bp-builder-sticker {
       position: absolute;
       left: 50%;
@@ -1014,6 +1087,11 @@
         border-radius: 22px;
       }
 
+      #bp-builder-{{ section.id }} .bp-builder-mode-tabs { width: 100%; }
+      #bp-builder-{{ section.id }} .bp-builder-mode-tab { flex: 1; min-width: 0; }
+      #bp-builder-{{ section.id }}.bp-builder-mode--draw .bp-builder-library-panel,
+      #bp-builder-{{ section.id }}.bp-builder-mode--text .bp-builder-library-panel { order: 2; }
+
       #bp-builder-{{ section.id }} .bp-builder-canvas-panel {
         order: 1;
         padding: 12px;
@@ -1191,12 +1269,25 @@
         emptyCopy: root.querySelector('[data-bp-empty-copy]'),
         canvas: root.querySelector('[data-bp-canvas]'),
         baseCharacter: root.querySelector('[data-bp-base-character]'),
+        drawingLayer: root.querySelector('[data-bp-drawing-layer]'),
         stickerLayer: root.querySelector('[data-bp-sticker-layer]'),
         bubble: root.querySelector('[data-bp-bubble]'),
         undo: root.querySelector('[data-bp-undo]'),
         redo: root.querySelector('[data-bp-redo]'),
         reset: root.querySelector('[data-bp-reset]'),
-        saveButtons: [...root.querySelectorAll('[data-bp-save], [data-bp-mobile-save]')]
+        saveButtons: [...root.querySelectorAll('[data-bp-save], [data-bp-mobile-save]')],
+        modeTabs: [...root.querySelectorAll('[data-bp-mode]')],
+        stickerPanels: [...root.querySelectorAll('[data-bp-sticker-panel]')],
+        drawPanel: root.querySelector('[data-bp-draw-panel]'),
+        textPanel: root.querySelector('[data-bp-text-panel]'),
+        drawColor: root.querySelector('[data-bp-draw-color]'),
+        brushSize: root.querySelector('[data-bp-brush-size]'),
+        eraser: root.querySelector('[data-bp-eraser]'),
+        clearDrawing: root.querySelector('[data-bp-clear-drawing]'),
+        textInput: root.querySelector('[data-bp-text-input]'),
+        textColor: root.querySelector('[data-bp-text-color]'),
+        textSize: root.querySelector('[data-bp-text-size]'),
+        addText: root.querySelector('[data-bp-add-text]')
       };
 
       const CATEGORY_ICON_MAP = {
@@ -1209,6 +1300,9 @@
         scarf: '🧣',
         accessories: '✨',
         accessory: '✨',
+        nature: '🌿',
+        food: '🍰',
+        objects: '🎁',
         props: '🎁',
         prop: '🎁',
         extras: '⭐',
@@ -1221,17 +1315,32 @@
         selectedPose: null,
         selectedCategory: null,
         stickers: [],
+        drawings: [],
+        activeMode: 'stickers',
+        erasing: false,
         activeStickerId: null,
         undoStack: [],
         redoStack: [],
         bubbleTimer: null
       };
 
-      const normalizeCategory = (value) => String(value || 'Extras').trim();
+      const normalizeCategory = (value) => String(value || 'accessories').trim();
       const keyCategory = (value) => normalizeCategory(value).toLowerCase();
 
       const getItemByHandle = (handle) => items.find((item) => item.handle === handle);
       const getPoseByHandle = (handle) => poses.find((pose) => pose.handle === handle);
+
+      const isItemCompatible = (item) => {
+        if (!item || !state.selectedCharacter) return false;
+        const compatibility = String(item.compatibility || '').trim().toLowerCase();
+
+        // Empty compatibility preserves the legacy pose-asset behavior.
+        if (!compatibility || compatibility === 'universal') return true;
+        if (compatibility !== 'character-specific') return true;
+
+        return Array.isArray(item.compatibleCharacterIds) &&
+          item.compatibleCharacterIds.includes(state.selectedCharacter.id);
+      };
 
       const escapeHtml = (value) =>
         String(value ?? '')
@@ -1380,13 +1489,40 @@
 
       function getAssetsForCurrentPose() {
         if (!state.selectedPose) return [];
-        return assets.filter(
+        const poseAssets = assets.filter(
           (asset) =>
             asset.poseHandle === state.selectedPose.handle &&
             asset.itemHandle &&
             asset.image &&
-            getItemByHandle(asset.itemHandle)
+            isItemCompatible(getItemByHandle(asset.itemHandle))
         );
+
+        // Explicitly universal items are general stickers. Their thumbnail is
+        // available on every pose unless a pose-specific asset overrides it.
+        const poseItemHandles = new Set(poseAssets.map((asset) => asset.itemHandle));
+        const generalAssets = items
+          .filter((item) => {
+            if (String(item.compatibility || '').trim().toLowerCase() !== 'universal') return false;
+            if (poseItemHandles.has(item.handle)) return false;
+            const neutralAsset = assets.find((asset) =>
+              asset.itemHandle === item.handle && !asset.poseHandle && asset.image
+            );
+            return Boolean(neutralAsset || item.thumbnail);
+          })
+          .map((item) => {
+            const neutralAsset = assets.find((asset) =>
+              asset.itemHandle === item.handle && !asset.poseHandle && asset.image
+            );
+            return {
+              id: neutralAsset?.id || `general:${item.id}`,
+              handle: neutralAsset?.handle || `general--${item.handle}`,
+              itemHandle: item.handle,
+              poseHandle: null,
+              image: neutralAsset?.image || item.thumbnail
+            };
+          });
+
+        return [...poseAssets, ...generalAssets];
       }
 
       function getCategoriesForCurrentPose() {
@@ -1492,7 +1628,7 @@
 
         els.itemGrid.querySelectorAll('[data-bp-asset]').forEach((button) => {
           button.addEventListener('click', () => {
-            const asset = assets.find((candidate) => candidate.handle === button.dataset.bpAsset);
+            const asset = currentAssets.find((candidate) => candidate.handle === button.dataset.bpAsset);
             if (asset) addSticker(asset);
           });
         });
@@ -1511,6 +1647,7 @@
         renderItems();
         renderStickers();
         showView('builder');
+        window.requestAnimationFrame(renderDrawing);
         showBubble();
       }
 
@@ -1529,7 +1666,10 @@
       }
 
       function cloneStickerState() {
-        return state.stickers.map((sticker) => ({ ...sticker }));
+        return {
+          stickers: state.stickers.map((sticker) => ({ ...sticker })),
+          drawings: state.drawings.map((stroke) => ({ ...stroke, points: stroke.points.map((point) => ({ ...point })) }))
+        };
       }
 
       function pushHistory() {
@@ -1540,9 +1680,11 @@
       }
 
       function restoreSnapshot(snapshot) {
-        state.stickers = snapshot.map((sticker) => ({ ...sticker }));
+        state.stickers = snapshot.stickers.map((sticker) => ({ ...sticker }));
+        state.drawings = snapshot.drawings.map((stroke) => ({ ...stroke, points: stroke.points.map((point) => ({ ...point })) }));
         state.activeStickerId = null;
         renderStickers();
+        renderDrawing();
         updateHistoryControls();
       }
 
@@ -1552,10 +1694,117 @@
       }
 
       function clearStickers(withHistory = true) {
-        if (withHistory && state.stickers.length) pushHistory();
+        if (withHistory && (state.stickers.length || state.drawings.length)) pushHistory();
         state.stickers = [];
+        state.drawings = [];
         state.activeStickerId = null;
         renderStickers();
+        renderDrawing();
+      }
+
+      function setMode(mode) {
+        state.activeMode = mode;
+        root.classList.toggle('bp-builder-mode--draw', mode === 'draw');
+        root.classList.toggle('bp-builder-mode--text', mode === 'text');
+        state.activeStickerId = null;
+        syncStickerSelectionUI();
+        els.modeTabs.forEach((tab) => {
+          const active = tab.dataset.bpMode === mode;
+          tab.classList.toggle('is-active', active);
+          tab.setAttribute('aria-selected', String(active));
+        });
+        els.stickerPanels.forEach((panel) => { panel.hidden = mode !== 'stickers'; });
+        if (els.drawPanel) els.drawPanel.hidden = mode !== 'draw';
+        if (els.textPanel) els.textPanel.hidden = mode !== 'text';
+        els.canvas.classList.toggle('is-drawing', mode === 'draw');
+      }
+
+      function addText() {
+        const text = String(els.textInput?.value || '').trim().slice(0, 80);
+        if (!text) return;
+        pushHistory();
+        const item = {
+          instanceId: `bp-text-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          type: 'text', text, name: text,
+          color: els.textColor?.value || '#241E30',
+          fontSize: Number(els.textSize?.value || 42),
+          x: 50, y: 48, scale: 1, rotation: 0
+        };
+        state.stickers.push(item);
+        state.activeStickerId = item.instanceId;
+        els.textInput.value = '';
+        renderStickers();
+      }
+
+      function renderDrawing() {
+        if (!els.drawingLayer) return;
+        const rect = els.canvas.getBoundingClientRect();
+        const ratio = window.devicePixelRatio || 1;
+        const width = Math.max(1, Math.round(rect.width * ratio));
+        const height = Math.max(1, Math.round(rect.height * ratio));
+        if (els.drawingLayer.width !== width) els.drawingLayer.width = width;
+        if (els.drawingLayer.height !== height) els.drawingLayer.height = height;
+        const ctx = els.drawingLayer.getContext('2d');
+        ctx.clearRect(0, 0, width, height);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        state.drawings.forEach((stroke) => {
+          if (!stroke.points.length) return;
+          ctx.save();
+          ctx.globalCompositeOperation = stroke.eraser ? 'destination-out' : 'source-over';
+          ctx.strokeStyle = stroke.color;
+          ctx.lineWidth = stroke.size * ratio;
+          ctx.beginPath();
+          stroke.points.forEach((point, index) => {
+            const x = point.x * width;
+            const y = point.y * height;
+            if (!index) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          if (stroke.points.length === 1) ctx.lineTo(stroke.points[0].x * width + 0.01, stroke.points[0].y * height);
+          ctx.stroke();
+          ctx.restore();
+        });
+      }
+
+      function drawingPoint(event) {
+        const rect = els.canvas.getBoundingClientRect();
+        return {
+          x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
+          y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height))
+        };
+      }
+
+      function bindDrawingEvents() {
+        if (!els.drawingLayer) return;
+        els.drawingLayer.addEventListener('pointerdown', (event) => {
+          if (state.activeMode !== 'draw' || event.button > 0) return;
+          event.preventDefault();
+          pushHistory();
+          const stroke = {
+            color: els.drawColor?.value || '#8B5CF6',
+            size: Number(els.brushSize?.value || 8),
+            eraser: state.erasing,
+            points: [drawingPoint(event)]
+          };
+          state.drawings.push(stroke);
+          els.drawingLayer.setPointerCapture(event.pointerId);
+          const move = (moveEvent) => {
+            moveEvent.preventDefault();
+            stroke.points.push(drawingPoint(moveEvent));
+            renderDrawing();
+          };
+          const up = () => {
+            els.drawingLayer.removeEventListener('pointermove', move);
+            els.drawingLayer.removeEventListener('pointerup', up);
+            els.drawingLayer.removeEventListener('pointercancel', up);
+            renderDrawing();
+          };
+          els.drawingLayer.addEventListener('pointermove', move);
+          els.drawingLayer.addEventListener('pointerup', up);
+          els.drawingLayer.addEventListener('pointercancel', up);
+          renderDrawing();
+        });
       }
 
       function addSticker(asset) {
@@ -1620,7 +1869,7 @@
 
         els.stickerLayer.innerHTML = state.stickers.map((sticker, index) => `
           <div
-            class="bp-builder-sticker ${state.activeStickerId === sticker.instanceId ? 'is-selected' : ''}"
+            class="bp-builder-sticker ${sticker.type === 'text' ? 'bp-builder-sticker--text' : ''} ${state.activeStickerId === sticker.instanceId ? 'is-selected' : ''}"
             data-bp-sticker-id="${escapeHtml(sticker.instanceId)}"
             style="
               left:${Number(sticker.x).toFixed(3)}%;
@@ -1633,7 +1882,9 @@
             aria-pressed="${state.activeStickerId === sticker.instanceId ? 'true' : 'false'}"
             aria-label="${escapeHtml(sticker.name || 'Sticker')}"
           >
-            <img src="${escapeHtml(sticker.image)}" alt="" draggable="false">
+            ${sticker.type === 'text'
+              ? `<span class="bp-builder-text-content" style="color:${escapeHtml(sticker.color)};font-size:${Number(sticker.fontSize)}px">${escapeHtml(sticker.text)}</span>`
+              : `<img src="${escapeHtml(sticker.image)}" alt="" draggable="false">`}
 
             <span class="bp-builder-sticker-outline" aria-hidden="true"></span>
 
@@ -1670,6 +1921,7 @@
         const instanceId = node.dataset.bpStickerId;
 
         node.addEventListener('pointerdown', (event) => {
+          if (state.activeMode === 'draw') return;
           if (event.target.closest('[data-bp-delete-sticker], [data-bp-resize-sticker], [data-bp-rotate-sticker]')) {
             return;
           }
@@ -1841,8 +2093,13 @@
       }
 
       function reset() {
-        if (!state.stickers.length) return;
-        clearStickers(true);
+        if (!state.stickers.length && !state.drawings.length) return;
+        pushHistory();
+        state.stickers = [];
+        state.drawings = [];
+        state.activeStickerId = null;
+        renderStickers();
+        renderDrawing();
       }
 
       function getSavePayload() {
@@ -1863,7 +2120,7 @@
                 name: state.selectedPose.name
               }
             : null,
-          stickers: state.stickers.map((sticker) => ({
+          stickers: state.stickers.filter((sticker) => sticker.type !== 'text').map((sticker) => ({
             assetId: sticker.assetId,
             assetHandle: sticker.assetHandle,
             itemId: sticker.itemId,
@@ -1873,6 +2130,21 @@
             y: Number(sticker.y.toFixed(4)),
             scale: Number(sticker.scale.toFixed(4)),
             rotation: Number(sticker.rotation.toFixed(3))
+          })),
+          texts: state.stickers.filter((sticker) => sticker.type === 'text').map((item) => ({
+            text: item.text,
+            color: item.color,
+            fontSize: item.fontSize,
+            x: Number(item.x.toFixed(4)),
+            y: Number(item.y.toFixed(4)),
+            scale: Number(item.scale.toFixed(4)),
+            rotation: Number(item.rotation.toFixed(3))
+          })),
+          drawings: state.drawings.map((stroke) => ({
+            color: stroke.color,
+            size: stroke.size,
+            eraser: stroke.eraser,
+            points: stroke.points.map((point) => ({ x: point.x, y: point.y }))
           }))
         };
       }
@@ -1911,6 +2183,21 @@
       }
 
       function wireStaticEvents() {
+        els.modeTabs.forEach((tab) => tab.addEventListener('click', () => setMode(tab.dataset.bpMode)));
+        els.addText?.addEventListener('click', addText);
+        els.textInput?.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') addText();
+        });
+        els.eraser?.addEventListener('click', () => {
+          state.erasing = !state.erasing;
+          els.eraser.setAttribute('aria-pressed', String(state.erasing));
+        });
+        els.clearDrawing?.addEventListener('click', () => {
+          if (!state.drawings.length) return;
+          pushHistory();
+          state.drawings = [];
+          renderDrawing();
+        });
         els.continueCharacter.addEventListener('click', () => {
           if (!state.selectedCharacter) return;
           renderPoses();
@@ -1979,6 +2266,8 @@
       }
 
       renderCharacters();
+      bindDrawingEvents();
+      if (window.ResizeObserver) new ResizeObserver(renderDrawing).observe(els.canvas);
       wireStaticEvents();
       updateHistoryControls();
 

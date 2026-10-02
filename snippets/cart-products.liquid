@@ -171,30 +171,10 @@
                         aria-label="Pilih {{ item.product.title | escape }} untuk checkout"
                         checked
                       >
-                      <span>Pilih</span>
+                     
                     </label>
                   {% endif %}
-                  {% if custom_design_id != blank and item.properties['_item_type'] == 'product' -%}
-                    <a
-                      href="{{ item.url }}"
-                      class="cart-items__media-container"
-                      target="_blank"
-                      rel="noopener"
-                      style="--ratio:1;"
-                      data-custom-design-preview="{{ custom_design_id | escape }}"
-                    >
-                      <img
-                        src="{{ item.image | image_url: width: 250 }}"
-                        data-design-side="front"
-                        class="cart-items__media-image border-style"
-                        alt="Custom product preview"
-                        width="250"
-                        height="250"
-                        loading="lazy"
-                      >
-                    </a>
-                  {% elsif item.image -%}
-                    {% liquid
+                  {% liquid
                       assign ratio = 1
                       assign border_opacity = settings.cart_thumbnail_border_opacity | divided_by: 100.0
                       assign border_override = '--border-width: [cart_thumbnail_border_width]px; --border-style: [cart_thumbnail_border_style]; --border-color: rgb(var(--color-border-rgb) / [cart_thumbnail_border_opacity]); --border-radius: [cart_thumbnail_border_radius]px;' | replace: '[cart_thumbnail_border_width]', settings.cart_thumbnail_border_width | replace: '[cart_thumbnail_border_style]', settings.cart_thumbnail_border | replace: '[cart_thumbnail_border_opacity]', border_opacity | replace: '[cart_thumbnail_border_radius]', settings.cart_thumbnail_border_radius
@@ -219,7 +199,6 @@
                         echo item.image | image_url: width: 250 | image_tag: class: 'cart-items__media-image border-style', style: border_override
                       -%}
                     </a>
-                  {%- endif %}
                 </td>
                 <td
                   class="cart-items__details cart-primary-typography"
@@ -472,7 +451,7 @@
 {% stylesheet %}
   .cart-items {
     --cart-item-media-width-min: 2.5rem;
-    --cart-item-media-width-max: 7.5rem;
+    --cart-item-media-width-max: 6rem;
 
     container-name: cart-items;
     container-type: inline-size;
@@ -548,7 +527,7 @@
     --cart-item-price-width: 6rem;
 
     display: grid;
-    grid-template-columns: clamp(2.5rem, 15cqi, 7.5rem) minmax(0, 1fr) minmax(var(--cart-item-price-width), auto);
+    grid-template-columns: clamp(var(--cart-item-media-width-min), 12cqi, var(--cart-item-media-width-max)) minmax(0, 1fr) minmax(var(--cart-item-price-width), auto);
     grid-template-areas:
       'media details price'
       'media quantity price'
@@ -561,7 +540,7 @@
 
   /* Cart drawer: separate grid areas for variants and unit price */
   .cart-drawer .cart-items__table-row--full-width-variants {
-    grid-template-columns: clamp(2.5rem, 15cqi, 7.5rem) minmax(0, 1fr) auto;
+    grid-template-columns: clamp(var(--cart-item-media-width-min), 12cqi, var(--cart-item-media-width-max)) minmax(0, 1fr) auto;
     grid-template-rows: repeat(4, min-content) 1fr;
     grid-template-areas:
       'media details price'

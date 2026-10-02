@@ -35,8 +35,15 @@
   }
 
   async function request(path, options) {
-    var response = await fetch(API + (path || ''), options || { headers: { Accept: 'application/json' } });
+    var requestOptions = Object.assign({
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' }
+    }, options || {});
+    var response = await fetch(API + (path || ''), requestOptions);
     var result = await response.json().catch(function () { return {}; });
+    if (response.status === 401 && result.error === 'Customer login required') {
+      throw new Error('Please sign in to save your design, then refresh this page and try again.');
+    }
     if (!response.ok) throw new Error(result.error || 'Design service is temporarily unavailable.');
     return result.data;
   }

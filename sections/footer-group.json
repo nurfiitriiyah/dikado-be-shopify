@@ -13,33 +13,113 @@
   "sections": {
     "footer_m9NzUG": {
       "type": "footer",
+      "blocks": {
+        "logo_m49ddG": {
+          "type": "logo",
+          "name": "t:names.logo",
+          "settings": {
+            "inverse": false,
+            "font": "heading",
+            "unit": "percent",
+            "percent_width": 100,
+            "pixel_height": 16,
+            "custom_mobile_size": false,
+            "unit_mobile": "percent",
+            "percent_width_mobile": 100,
+            "pixel_height_mobile": 120,
+            "padding-block-start": 0,
+            "padding-block-end": 0,
+            "padding-inline-start": 0,
+            "padding-inline-end": 0
+          },
+          "blocks": {}
+        },
+        "text_rfrxNN": {
+          "type": "text",
+          "name": "t:names.text",
+          "settings": {
+            "text": "<p><em><strong>DikadoIn</strong></em></p><p><em>Gifts for people you actually like.</em></p><p>For birthdays, bad days, random Tuesdays,<br/>or just because. 🎁</p><p><strong>Based in</strong><br/>Jagakarsa, Jakarta Selatan</p>",
+            "width": "fit-content",
+            "max_width": "normal",
+            "alignment": "left",
+            "type_preset": "rte",
+            "font": "var(--font-body--family)",
+            "font_size": "1rem",
+            "line_height": "normal",
+            "letter_spacing": "normal",
+            "case": "none",
+            "wrap": "pretty",
+            "color": "var(--color-foreground)",
+            "background": false,
+            "background_color": "#00000026",
+            "corner_radius": 0,
+            "padding-block-start": 0,
+            "padding-block-end": 0,
+            "padding-inline-start": 0,
+            "padding-inline-end": 0
+          },
+          "blocks": {}
+        },
+        "text_yxiWKP": {
+          "type": "text",
+          "name": "t:names.text",
+          "settings": {
+            "text": "<p><strong>Need something?</strong> Chat with us on WhatsApp<br/>+62 822-4624-1501</p>",
+            "width": "fit-content",
+            "max_width": "normal",
+            "alignment": "left",
+            "type_preset": "rte",
+            "font": "var(--font-body--family)",
+            "font_size": "1rem",
+            "line_height": "normal",
+            "letter_spacing": "normal",
+            "case": "none",
+            "wrap": "pretty",
+            "color": "var(--color-foreground)",
+            "background": false,
+            "background_color": "#00000026",
+            "corner_radius": 0,
+            "padding-block-start": 0,
+            "padding-block-end": 0,
+            "padding-inline-start": 0,
+            "padding-inline-end": 0
+          },
+          "blocks": {}
+        }
+      },
+      "block_order": [
+        "logo_m49ddG",
+        "text_rfrxNN",
+        "text_yxiWKP"
+      ],
       "name": "t:names.footer",
       "settings": {
         "section_width": "page-width",
-        "gap": 20,
-        "color_scheme": "scheme-1",
-        "padding-block-start": 30,
-        "padding-block-end": 30
+        "gap": 0,
+        "color_scheme": "scheme-59befa1d-bea5-4a37-aa16-fc5a3d0f52ad",
+        "padding-block-start": 15,
+        "padding-block-end": 0
       }
     },
     "footer_utilities_jLGE8U": {
       "type": "footer-utilities",
       "blocks": {
-        "footer_copyright_jweRK8": {
-          "type": "footer-copyright",
+        "footer_policy_list_7D3LTm": {
+          "type": "footer-policy-list",
+          "name": "t:names.policy_list",
           "settings": {
-            "show_powered_by": false,
             "font_size": "0.75rem",
             "case": "none"
           },
           "blocks": {}
         },
-        "social_links_Ew63Kq": {
+        "social_links_jJqPdw": {
           "type": "social-links",
+          "name": "t:names.social_media_links",
           "settings": {
-            "facebook_url": "",
-            "instagram_url": "",
-            "youtube_url": "",
+            "facebook_url": "https://google.com",
+            "instagram_url": "https://google.com",
+            "youtube_url": "https://google.com",
             "tiktok_url": "",
             "twitter_url": "",
             "threads_url": "",
@@ -52,11 +132,21 @@
             "custom_url": ""
           },
           "blocks": {}
+        },
+        "footer_copyright_jweRK8": {
+          "type": "footer-copyright",
+          "settings": {
+            "show_powered_by": false,
+            "font_size": "0.75rem",
+            "case": "none"
+          },
+          "blocks": {}
         }
       },
       "block_order": [
-        "footer_copyright_jweRK8",
-        "social_links_Ew63Kq"
+        "footer_policy_list_7D3LTm",
+        "social_links_jJqPdw",
+        "footer_copyright_jweRK8"
       ],
       "name": "t:names.utilities",
       "settings": {

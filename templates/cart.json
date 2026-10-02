@@ -6,7 +6,8 @@
  * or related systems. Please exercise caution as any changes
  * made to this file may be overwritten.
  * ------------------------------------------------------------
- */{
+ */
+{
   "sections": {
     "cart-section": {
       "type": "main-cart",
@@ -58,7 +59,7 @@
       },
       "settings": {
         "section_width": "page-width",
-        "color_scheme": "",
+        "color_scheme": "scheme-59befa1d-bea5-4a37-aa16-fc5a3d0f52ad",
         "padding-block-start": 24,
         "padding-block-end": 0
       }

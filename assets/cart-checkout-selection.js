@@ -4,7 +4,6 @@
   var SELECTION_KEY = 'dikadoCheckoutSelection';
   var RESTORE_KEY = 'dikadoCheckoutRestore';
   var selected = null;
-  var bypassSubmitter = null;
   var preparing = false;
   var prepared = false;
   var initialized = false;
@@ -12,6 +11,15 @@
 
   function rootPath() {
     return (window.Shopify && Shopify.routes && Shopify.routes.root) || '/';
+  }
+
+  function goToPrecheckout() {
+    window.location.assign(window.DikadoPrecheckoutUrl || rootPath() + 'pages/checkout-dikado');
+  }
+
+  function isCheckoutFlowPath() {
+    var path = window.location.pathname;
+    return path === '/pages/checkout-dikado' || path === '/pages/custom-chekout' || path === '/checkout' || path.indexOf('/checkouts/') === 0;
   }
 
   async function cartRequest(path, options) {
@@ -115,6 +123,9 @@
     if (preparing) throw new Error('Checkout sedang disiapkan.');
     preparing = true;
     try {
+      if (window.DikadoCartSync && typeof window.DikadoCartSync.pauseForCheckout === 'function') {
+        window.DikadoCartSync.pauseForCheckout();
+      }
       if (window.CustomCartBundle && typeof window.CustomCartBundle.ensureIntegrity === 'function') {
         await window.CustomCartBundle.ensureIntegrity();
       }
@@ -212,15 +223,24 @@
 
   async function onSubmit(event) {
     var submitter = event.submitter;
-    if (!submitter || submitter.name !== 'checkout' || submitter === bypassSubmitter) return;
-    if (document.querySelector('hamper-modal')) return;
+    if (!submitter || submitter.name !== 'checkout') return;
+    var hamperModal = document.querySelector('hamper-modal');
+    if (hamperModal) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (typeof hamperModal.openCheckoutPrompt === 'function') {
+        await hamperModal.openCheckoutPrompt(event.target, submitter);
+      } else {
+        console.error('[Checkout selection] Hamper checkout is not ready.');
+        window.alert('Opsi hamper belum siap. Muat ulang halaman lalu coba lagi.');
+      }
+      return;
+    }
     event.preventDefault();
     event.stopImmediatePropagation();
     try {
       await prepare();
-      bypassSubmitter = submitter;
-      event.target.requestSubmit(submitter);
-      setTimeout(function () { bypassSubmitter = null; }, 0);
+      goToPrecheckout();
     } catch (error) {
       console.error('[Checkout selection] Could not prepare checkout.', error);
       window.alert(error.message || 'Produk checkout tidak dapat disiapkan.');
@@ -231,14 +251,17 @@
     isSelected: isSelected,
     setSelected: setSelected,
     prepare: prepare,
-    restore: restorePending
+    restore: restorePending,
+    goToPrecheckout: goToPrecheckout
   };
   document.addEventListener('change', onChange);
   document.addEventListener('submit', onSubmit, true);
   var observer = new MutationObserver(initializeSelection);
   observer.observe(document.body, { childList: true, subtree: true });
   initializeSelection();
-  restorePending().then(initializeSelection).catch(function (error) {
-    console.error('[Checkout selection] Could not restore saved cart items.', error);
-  });
+  if (!isCheckoutFlowPath()) {
+    restorePending().then(initializeSelection).catch(function (error) {
+      console.error('[Checkout selection] Could not restore saved cart items.', error);
+    });
+  }
 })();

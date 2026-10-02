@@ -9,6 +9,12 @@
   var PREVIEW_MAX_WIDTH = 1600;
   var PRINT_DPI = 300;
   var MAX_EXPORT_DIMENSION = 5000;
+  var SCREEN_PRINT_TEXT_MAX_LENGTH = 120;
+  var EMBROIDERY_TEXT_MAX_LENGTH = NS.EMBROIDERY_TEXT_MAX_LENGTH || 12;
+
+  function truncateText(value, maxLength) {
+    return String(value == null ? '' : value).slice(0, maxLength);
+  }
 
   function ensureFabric() {
     if (window.fabric && window.fabric.Canvas) return Promise.resolve(window.fabric);
@@ -211,7 +217,7 @@
     };
   };
 
-  function CanvasEditor(canvasEl, frameCropper) {
+  function CanvasEditor(canvasEl, frameCropper, textMaxLength) {
     this.canvasEl = canvasEl;
     this.frameCropper = frameCropper;
     this.canvas = null;
@@ -224,6 +230,7 @@
     this.side = 'front';
     this.mockupUrl = null;
     this.textChangeHandler = null;
+    this.textMaxLength = Number(textMaxLength) || SCREEN_PRINT_TEXT_MAX_LENGTH;
     this.zoneManager = new PrintZoneManager();
     this.onZoneChange = null;
     this.onArtworkChange = null;
@@ -253,13 +260,20 @@
     function enforce(event) {
       if (!event || !event.target) return;
       if (event.target._customizerRole) return;
-      self.keepInsideZone(event.target);
+      self.applyZoneClip(event.target);
     }
 
     this.canvas.on('object:moving', enforce);
     this.canvas.on('object:scaling', enforce);
     this.canvas.on('object:rotating', enforce);
     this.canvas.on('object:modified', enforce);
+    this.canvas.on('text:changed', function (event) {
+      var text = event && event.target;
+      if (!text) return;
+      var limitedValue = truncateText(text.text, self.textMaxLength);
+      if (text.text !== limitedValue) text.set({ text: limitedValue });
+      enforce(event);
+    });
     this.canvas.on('selection:created', function (event) { self.activateObjectZone(event.selected && event.selected[0]); });
     this.canvas.on('selection:updated', function (event) { self.activateObjectZone(event.selected && event.selected[0]); });
     this.canvas.on('mouse:down', function (event) {
@@ -281,32 +295,25 @@
     if (!object) return;
     var zone = this.zoneRects[String(object._zoneId || this.activeZoneId)];
     if (!zone) return;
-    object.setCoords();
-    var bounds = object.getBoundingRect(true, true);
-
-    var maxWidth = zone.width;
-    var maxHeight = zone.height;
-    if (bounds.width > maxWidth || bounds.height > maxHeight) {
-      var shrink = Math.min(maxWidth / bounds.width, maxHeight / bounds.height) * 0.98;
-      if (Number.isFinite(shrink) && shrink > 0 && shrink < 1) {
-        object.scaleX *= shrink;
-        object.scaleY *= shrink;
-        object.setCoords();
-        bounds = object.getBoundingRect(true, true);
-      }
-    }
-
-    var dx = 0;
-    var dy = 0;
-    if (bounds.left < zone.left) dx = zone.left - bounds.left;
-    if (bounds.top < zone.top) dy = zone.top - bounds.top;
-    if (bounds.left + bounds.width > zone.left + zone.width) dx = (zone.left + zone.width) - (bounds.left + bounds.width);
-    if (bounds.top + bounds.height > zone.top + zone.height) dy = (zone.top + zone.height) - (bounds.top + bounds.height);
-
-    object.left += dx;
-    object.top += dy;
-    object.setCoords();
+    this.applyZoneClip(object);
     if (this.canvas) this.canvas.requestRenderAll();
+  };
+
+  CanvasEditor.prototype.applyZoneClip = function (object) {
+    if (!object || object._customizerRole) return;
+    var zone = this.zoneRects[String(object._zoneId || this.activeZoneId)];
+    if (!zone) return;
+    object.clipPath = new fabric.Rect({
+      left: zone.left,
+      top: zone.top,
+      width: zone.width,
+      height: zone.height,
+      originX: 'left',
+      originY: 'top',
+      absolutePositioned: true
+    });
+    object.dirty = true;
+    object.setCoords();
   };
 
   CanvasEditor.prototype.loadSurface = async function (options) {
@@ -332,6 +339,15 @@
     var logicalHeight = Math.max(400, Math.round(logicalWidth * nativeImage.naturalHeight / nativeImage.naturalWidth));
     this.canvas.setWidth(logicalWidth);
     this.canvas.setHeight(logicalHeight);
+
+    // Fabric gives its wrapper a fixed logical height. When the wrapper width
+    // shrinks to fit the editor column, keep that height in the same ratio so
+    // the full canvas participates in the modal's scroll area instead of being
+    // clipped at the old viewport-height cap.
+    var canvasWrap = this.canvasEl.closest('.customizer-canvas-wrap');
+    if (canvasWrap) {
+      canvasWrap.style.setProperty('--customizer-canvas-aspect-ratio', logicalWidth + ' / ' + logicalHeight);
+    }
 
     var self = this;
     var mockup = await new Promise(function (resolve, reject) {
@@ -427,6 +443,9 @@
     }, this);
 
     this.activeZoneId = allowed.has(String(previousActive)) ? String(previousActive) : (zones[0] ? String(zones[0].id) : null);
+    this.canvas.getObjects().forEach(function (object) {
+      if (!object._customizerRole) this.applyZoneClip(object);
+    }, this);
     this.refreshBoundaryStyles();
     this.bringGuidesToFront();
     this.notifyArtworkChange();
@@ -537,11 +556,11 @@
     _zoneId: String(this.activeZoneId)
   });
 
-  if (customMeta) {
-    image._frameMeta = customMeta;
-  }
+  if (customMeta && role === 'frame') image._frameMeta = customMeta;
+  if (customMeta && role === 'embroidery') image._embroideryMeta = customMeta;
 
   this.centerObjectInZone(image);
+  this.applyZoneClip(image);
 
   this.canvas.add(image);
 
@@ -558,8 +577,74 @@
     return this.addBlobImage(file, 'upload');
   };
 
+  CanvasEditor.prototype.addSticker = async function (url) {
+    var response = await fetch(url, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error('Unable to load this sticker.');
+    return this.addBlobImage(await response.blob(), 'sticker');
+  };
+
   CanvasEditor.prototype.addCharacter = async function (blob) {
     return this.addBlobImage(blob, 'character');
+  };
+
+  CanvasEditor.prototype.getEmbroideryObject = function () {
+    if (!this.canvas) return null;
+    return this.canvas.getObjects().find(function (object) {
+      return object._customizerObjectType === 'embroidery';
+    }) || null;
+  };
+
+  CanvasEditor.prototype.captureEmbroideryTransform = function () {
+    var object = this.getEmbroideryObject();
+    if (!object) return null;
+    var center = object.getCenterPoint();
+    return {
+      zoneId: String(object._zoneId),
+      left: object.left,
+      top: object.top,
+      centerX: center.x,
+      centerY: center.y,
+      angle: object.angle || 0,
+      scaleX: object.scaleX,
+      scaleY: object.scaleY,
+      displayedWidth: object.getScaledWidth(),
+      displayedHeight: object.getScaledHeight()
+    };
+  };
+
+  CanvasEditor.prototype.replaceEmbroidery = async function (blob, meta, transform) {
+    if (!this.canvas) throw new Error('Editor Bordir belum siap.');
+    this.canvas.getObjects().slice().forEach(function (object) {
+      if (object._customizerObjectType === 'embroidery') this.canvas.remove(object);
+    }, this);
+
+    if (transform && transform.zoneId && this.zoneRects[String(transform.zoneId)]) {
+      this.setActiveZone(transform.zoneId);
+    }
+    var image = await this.addBlobImage(blob, 'embroidery', meta);
+    if (transform && String(transform.zoneId) === String(image._zoneId)) {
+      var proportionalScale = Math.min(
+        Number(transform.displayedWidth) / image.width,
+        Number(transform.displayedHeight) / image.height
+      );
+      var preserveProportions = Number.isFinite(proportionalScale) && proportionalScale > 0;
+      image.set({
+        left: Number.isFinite(transform.centerX) ? transform.centerX : transform.left,
+        top: Number.isFinite(transform.centerY) ? transform.centerY : transform.top,
+        originX: Number.isFinite(transform.centerX) ? 'center' : image.originX,
+        originY: Number.isFinite(transform.centerY) ? 'center' : image.originY,
+        angle: transform.angle,
+        scaleX: preserveProportions ? proportionalScale : transform.scaleX,
+        scaleY: preserveProportions ? proportionalScale : transform.scaleY
+      });
+      image.setCoords();
+      this.keepInsideZone(image);
+      this.bringGuidesToFront();
+      this.canvas.setActiveObject(image);
+      this.canvas.requestRenderAll();
+      this.notifyArtworkChange();
+    }
+    return image;
   };
 
   CanvasEditor.prototype.addZoneArtwork = async function (blob, zoneId, role) {
@@ -587,7 +672,7 @@
   var zone = this.zoneRects[String(this.activeZoneId)];
   if (!zone) throw new Error('Choose a print area before adding text.');
 
-  var object = new fabric.IText(text || 'Your text', {
+  var object = new fabric.IText(truncateText(text || 'Your text', this.textMaxLength), {
     left: zone.left + zone.width / 2,
     top: zone.top + zone.height / 2,
 
@@ -670,6 +755,25 @@
     this.notifyArtworkChange();
   };
 
+  CanvasEditor.prototype.getFlippableActiveObject = function () {
+    if (!this.canvas) return null;
+    var active = this.canvas.getActiveObject();
+    if (!active) return null;
+    return ['character', 'upload', 'sticker'].indexOf(active._customizerObjectType) >= 0 ? active : null;
+  };
+
+  CanvasEditor.prototype.flipActiveHorizontal = function () {
+    var active = this.getFlippableActiveObject();
+    if (!active) return false;
+
+    active.set({ flipX: !active.flipX });
+    active.setCoords();
+    this.keepInsideZone(active);
+    this.canvas.requestRenderAll();
+    this.notifyArtworkChange();
+    return true;
+  };
+
   CanvasEditor.prototype.deleteActive = function () {
     var active = this.canvas.getActiveObjects();
     if (!active.length) return;
@@ -683,6 +787,11 @@
   CanvasEditor.prototype.getActiveText = function () {
     var active = this.canvas.getActiveObject();
     return active && (active.type === 'i-text' || active.type === 'text') ? active : null;
+  };
+
+  CanvasEditor.prototype.getDesignObjects = function () {
+    if (!this.canvas) return [];
+    return this.canvas.getObjects().filter(function (object) { return !object._customizerRole; });
   };
 
   CanvasEditor.prototype.hasArtwork = function (zoneId) {
@@ -825,6 +934,12 @@
     baseForm.append('properties[_custom_group_id]', payload.designId);
     baseForm.append('properties[_item_type]', 'product');
     baseForm.append('properties[_customized]', 'true');
+    baseForm.append('properties[_customization_type]', payload.customizationType || 'screen_print');
+    if (payload.customizationType === 'embroidery') {
+      baseForm.append('properties[_embroidery_text]', payload.embroideryText || '');
+      baseForm.append('properties[_embroidery_template]', payload.embroideryTemplate || '');
+      baseForm.append('properties[_embroidery_color]', payload.embroideryColor || '');
+    }
     // Keep the first-zone fields for older cart/theme code while version 3
     // stores ordered multi-zone metadata in JSON arrays.
     baseForm.append('properties[_front_zone]', zoneIds[0]);
@@ -845,11 +960,19 @@
       baseForm.append('properties[_back_artwork_zones]', JSON.stringify(backZoneIds));
       baseForm.append('properties[_back_fee_variant_id]', backFeeVariantIds[0]);
     }
-    baseForm.append('properties[Customization]', payload.hasBack
-      ? 'Custom design · Front + Back'
-      : 'Custom design · Front');
-    baseForm.append('properties[Front print areas]', zoneLabels.join(', '));
-    if (payload.hasBack) baseForm.append('properties[Back print areas]', backZoneLabels.join(', '));
+    baseForm.append('properties[Customization]', payload.customizationType === 'embroidery'
+      ? 'Bordir'
+      : (payload.hasBack ? 'Custom design · Front + Back' : 'Custom design · Front'));
+    if (payload.customizationType === 'embroidery') {
+      baseForm.append('properties[Embroidery text]', payload.embroideryText || '');
+      baseForm.append('properties[Embroidery template]', payload.embroideryTemplateLabel || payload.embroideryTemplate || '');
+      baseForm.append('properties[Embroidery color]', payload.embroideryColorLabel || payload.embroideryColor || '');
+      baseForm.append('properties[Area bordir]', zoneLabels.join(', '));
+      if (payload.hasBack) baseForm.append('properties[Area bordir belakang]', backZoneLabels.join(', '));
+    } else {
+      baseForm.append('properties[Front print areas]', zoneLabels.join(', '));
+      if (payload.hasBack) baseForm.append('properties[Back print areas]', backZoneLabels.join(', '));
+    }
 
     var baseResponse = await fetch(this.root() + 'cart/add.js', {
       method: 'POST',
@@ -872,6 +995,7 @@
           '_design_id': payload.designId,
           '_custom_group_id': payload.designId,
           '_item_type': 'print_fee',
+          '_customization_type': payload.customizationType || 'screen_print',
           '_side': 'front',
           '_zone': String(zone.id),
           'Print side': 'Front',
@@ -888,6 +1012,7 @@
           '_design_id': payload.designId,
           '_custom_group_id': payload.designId,
           '_item_type': 'print_fee',
+          '_customization_type': payload.customizationType || 'screen_print',
           '_side': 'back',
           '_zone': String(zone.id),
           'Print side': 'Back',
@@ -913,7 +1038,11 @@
       }
     }
 
-    return this.getCart();
+    var cart = await this.getCart();
+    if (window.DikadoCartSync && typeof window.DikadoCartSync.commitCart === 'function') {
+      await window.DikadoCartSync.commitCart(cart);
+    }
+    return cart;
   };
 
   ShopifyCartService.prototype.getCart = async function () {
@@ -944,30 +1073,79 @@
     this.root = root;
     this.dialog = root;
     this.loader = new ProductConfigLoader(root);
+    this.isEmbroidery = this.loader.product.isEmbroidery === true;
+    this.customizationType = this.isEmbroidery ? 'embroidery' : 'screen_print';
+    this.textMaxLength = this.isEmbroidery ? EMBROIDERY_TEXT_MAX_LENGTH : SCREEN_PRINT_TEXT_MAX_LENGTH;
     this.mockups = new VariantMockupManager(this.loader);
     this.price = new PriceCalculator(this.loader);
     this.frameCropper = new NS.FrameCropper();
     this.characterBuilder = new NS.CharacterBuilderAdapter(root);
     this.cart = new ShopifyCartService();
-    this.canvasEditor = new CanvasEditor(root.querySelector('[data-customizer-canvas]'), this.frameCropper);
+    this.canvasEditor = new CanvasEditor(
+      root.querySelector('[data-customizer-canvas]'),
+      this.frameCropper,
+      this.textMaxLength
+    );
+    try {
+      this.stickers = JSON.parse(root.parentElement.querySelector('[data-customizer-stickers]')?.textContent || '[]');
+    } catch (error) {
+      console.error('[Customizer] Unable to parse universal stickers.', error);
+      this.stickers = [];
+    }
 
     this.state = {
       designId: null,
       variantId: null,
       quantity: 1,
       characterBlob: null,
+      embroideryText: '',
+      embroideryTemplateId: null,
+      embroideryTemplateLabel: null,
+      embroideryColor: null,
+      embroideryColorLabel: null,
+      embroideryArtworkBlob: null,
+      backEmbroideryText: '',
+      backEmbroideryTemplateId: null,
+      backEmbroideryTemplateLabel: null,
+      backEmbroideryColor: null,
+      backEmbroideryColorLabel: null,
+      backEmbroideryArtworkBlob: null,
       frontZones: [],
       frontArtworks: {},
       frontCompositeArtwork: null,
       frontPreview: null,
+      frontDesignSummary: null,
       backZones: [],
       backArtworks: {},
       backCompositeArtwork: null,
       backPreview: null,
+      backDesignSummary: null,
       hasBack: false,
       editingSide: 'front',
       backMode: null
     };
+
+    this.embroideryBuilder = null;
+    this.pendingEmbroideryTransform = null;
+    this.editingEmbroideryPlacement = false;
+    if (this.isEmbroidery) {
+      if (!NS.EmbroideryDesignBuilder) throw new Error('EmbroideryDesignBuilder is unavailable.');
+      var embroideryTemplates = [];
+      var embroideryTemplatesScript = document.getElementById(root.dataset.embroideryTemplatesScript || '');
+      try {
+        embroideryTemplates = JSON.parse(embroideryTemplatesScript ? embroideryTemplatesScript.textContent : '[]');
+      } catch (error) {
+        console.error('[Customizer] Unable to parse embroidery templates. Using the text-only fallback.', error);
+      }
+      var controller = this;
+      this.embroideryBuilder = new NS.EmbroideryDesignBuilder(
+        root.querySelector('[data-embroidery-builder]'),
+        {
+          templates: embroideryTemplates,
+          onConfirm: function (result) { return controller.confirmEmbroideryDesign(result); }
+        }
+      );
+    }
 
     this.objectUrls = [];
     this.isProcessing = false;
@@ -977,8 +1155,20 @@
       self.updateEditorLabels(self.state.editingSide, self.canvasEditor.getActiveZone());
     };
     this.canvasEditor.onArtworkChange = function () { self.renderEditorZones(); };
+    this.applyCustomizationMode();
     this.bind();
   }
+
+  CustomizerController.prototype.applyCustomizationMode = function () {
+    this.root.dataset.customizationMode = this.customizationType;
+    var textInput = this.root.querySelector('[data-text-value]');
+    if (textInput) textInput.maxLength = this.textMaxLength;
+    if (!this.isEmbroidery) return;
+    this.root.querySelectorAll('[data-embroidery-unavailable]').forEach(function (element) {
+      element.hidden = true;
+      if ('disabled' in element) element.disabled = true;
+    });
+  };
 
   CustomizerController.prototype.bind = function () {
     var self = this;
@@ -999,12 +1189,35 @@
     });
 
     this.root.querySelector('[data-tool-character]').addEventListener('click', function () { self.addCharacterToEditor(); });
+    this.root.querySelector('[data-tool-stickers]').addEventListener('click', function () { self.openStickerPicker(); });
+    this.root.querySelector('[data-sticker-close]').addEventListener('click', function () { self.closeStickerPicker(); });
+    this.root.querySelector('[data-sticker-dialog]').addEventListener('click', function (event) {
+      if (event.target === event.currentTarget) self.closeStickerPicker();
+    });
+    this.root.addEventListener('keydown', function (event) {
+      var picker = self.root.querySelector('[data-sticker-dialog]');
+      if (event.key === 'Escape' && !picker.hidden) {
+        event.preventDefault();
+        event.stopPropagation();
+        self.closeStickerPicker();
+      }
+    });
+    this.root.querySelector('[data-sticker-grid]').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-sticker-index]');
+      if (button) self.addStickerToEditor(Number(button.dataset.stickerIndex));
+    });
     this.root.querySelector('[data-tool-text]').addEventListener('click', function () { self.addText(); });
+    this.root.querySelector('[data-tool-edit-embroidery]').addEventListener('click', function () { self.editEmbroideryDesign(); });
     this.root.querySelector('[data-tool-upload]').addEventListener('click', function () {
       self.root.querySelector('[data-image-upload]').click();
     });
     this.root.querySelector('[data-image-upload]').addEventListener('change', function (event) { self.addUploadedImage(event); });
     this.root.querySelector('[data-tool-frame]').addEventListener('click', function () { self.promptFrame(); });
+    this.root.querySelector('[data-tool-flip]').addEventListener('click', function () {
+      if (self.isEmbroidery) return;
+      self.canvasEditor.flipActiveHorizontal();
+      self.syncEditorTools();
+    });
     this.root.querySelector('[data-tool-delete]').addEventListener('click', function () { self.canvasEditor.deleteActive(); });
 
     this.root.querySelectorAll('[data-editor-back]').forEach(function (button) {
@@ -1027,7 +1240,7 @@
     this.bindTextControls();
 
     document.addEventListener('dblclick', function () {
-      if (!self.dialog.open || !self.canvasEditor.canvas) return;
+      if (self.isEmbroidery || !self.dialog.open || !self.canvasEditor.canvas) return;
       var active = self.canvasEditor.canvas.getActiveObject();
       if (active && active._customizerObjectType === 'frame') {
         self.canvasEditor.editActiveFrame().catch(function (error) {
@@ -1045,24 +1258,34 @@
     var size = this.root.querySelector('[data-text-size]');
     var color = this.root.querySelector('[data-text-color]');
 
+    value.maxLength = this.textMaxLength;
+
     function sync() {
-  var text = self.canvasEditor.getActiveText();
+      var text = self.canvasEditor.getActiveText();
+      if (!text) return;
 
-  if (!text) return;
+      var limitedValue = truncateText(value.value, self.textMaxLength);
+      if (value.value !== limitedValue) {
+        value.value = limitedValue;
+        self.setStatus(
+          self.isEmbroidery
+            ? 'Teks Bordir maksimal 12 karakter, termasuk spasi.'
+            : 'Text is limited to 120 characters.',
+          true
+        );
+      }
 
-  text.set({
-    text: value.value,
-    fontFamily: font.value,
-    fontSize: Number(size.value),
-    fill: color.value
-  });
+      text.set({
+        text: limitedValue,
+        fontFamily: font.value,
+        fontSize: Number(size.value),
+        fill: color.value
+      });
 
-  text.setCoords();
-
-  self.canvasEditor.keepInsideZone(text);
-
-  self.canvasEditor.canvas.requestRenderAll();
-}
+      text.setCoords();
+      self.canvasEditor.keepInsideZone(text);
+      self.canvasEditor.canvas.requestRenderAll();
+    }
 
     [value, font, size, color].forEach(function (input) { input.addEventListener('input', sync); });
 
@@ -1070,7 +1293,13 @@
       var text = self.canvasEditor.getActiveText();
       wrap.hidden = !text;
       if (!text) return;
-      value.value = text.text || '';
+      var limitedValue = truncateText(text.text || '', self.textMaxLength);
+      if (text.text !== limitedValue) {
+        text.set({ text: limitedValue });
+        text.setCoords();
+        self.canvasEditor.keepInsideZone(text);
+      }
+      value.value = limitedValue;
       font.value = text.fontFamily || 'Arial';
       size.value = Math.round(text.fontSize || 48);
       color.value = typeof text.fill === 'string' && text.fill.charAt(0) === '#' ? text.fill : '#3b2a23';
@@ -1086,8 +1315,16 @@
     ['selection:created', 'selection:updated', 'selection:cleared'].forEach(function (name) {
       self.canvasEditor.canvas.on(name, function () {
         if (self._syncTextControls) self._syncTextControls();
+        self.syncEditorTools();
       });
     });
+    this.syncEditorTools();
+  };
+
+  CustomizerController.prototype.syncEditorTools = function () {
+    var flipButton = this.root.querySelector('[data-tool-flip]');
+    if (!flipButton) return;
+    flipButton.disabled = this.isEmbroidery || !this.canvasEditor.getFlippableActiveObject();
   };
 
   CustomizerController.prototype.open = function (variantId, quantity) {
@@ -1099,12 +1336,14 @@
     this.state.designId = uid();
     this.state.variantId = String(variantId);
     this.state.quantity = quantity || 1;
-    this.showStep('character');
+    if (this.isEmbroidery) this.openEmbroideryBuilder('front');
+    else this.showStep('character');
     this.dialog.showModal();
   };
 
   CustomizerController.prototype.close = function () {
     if (this.isProcessing) return;
+    this.closeStickerPicker();
     if (this.dialog.open) this.dialog.close();
     this.canvasEditor.dispose();
     this._selectionBound = false;
@@ -1120,28 +1359,56 @@
       variantId: null,
       quantity: 1,
       characterBlob: null,
+      embroideryText: '',
+      embroideryTemplateId: null,
+      embroideryTemplateLabel: null,
+      embroideryColor: null,
+      embroideryColorLabel: null,
+      embroideryArtworkBlob: null,
+      backEmbroideryText: '',
+      backEmbroideryTemplateId: null,
+      backEmbroideryTemplateLabel: null,
+      backEmbroideryColor: null,
+      backEmbroideryColorLabel: null,
+      backEmbroideryArtworkBlob: null,
       frontZones: [],
       frontArtworks: {},
       frontCompositeArtwork: null,
       frontPreview: null,
+      frontDesignSummary: null,
       backZones: [],
       backArtworks: {},
       backCompositeArtwork: null,
       backPreview: null,
+      backDesignSummary: null,
       hasBack: false,
       editingSide: 'front',
       backMode: null
     };
+    this.pendingEmbroideryTransform = null;
+    this.editingEmbroideryPlacement = false;
     this.root.querySelector('[data-character-result]').hidden = true;
     this.root.querySelector('[data-character-preview]').removeAttribute('src');
     this.setStatus('');
   };
 
   CustomizerController.prototype.showStep = function (name) {
+    if (this.isEmbroidery && name === 'character') {
+      this.openEmbroideryBuilder('front');
+      return;
+    }
     this.root.querySelectorAll('[data-step]').forEach(function (step) {
       step.classList.toggle('is-active', step.dataset.step === name);
     });
-    var labels = {
+    var labels = this.isEmbroidery ? {
+      embroidery: this.state.editingSide === 'back' ? 'Design Bordir belakang' : 'Design Bordir',
+      zone: 'Pilih area Bordir depan',
+      editor: this.state.editingSide === 'back' ? 'Desain Bordir belakang' : 'Desain Bordir depan',
+      'back-choice': 'Pilihan Bordir belakang',
+      'back-mode': 'Pilih mode Bordir belakang',
+      'back-zone': 'Pilih area Bordir belakang',
+      review: 'Review dan tambahkan Bordir ke keranjang'
+    } : {
       character: 'Create character',
       zone: 'Choose front print positions',
       editor: this.state.editingSide === 'back' ? 'Design back' : 'Design front',
@@ -1156,6 +1423,7 @@
   };
 
   CustomizerController.prototype.createCharacter = async function () {
+    if (this.isEmbroidery) return;
     try {
       var blob = await this.characterBuilder.open();
       this.state.characterBlob = blob;
@@ -1168,14 +1436,129 @@
     }
   };
 
+  CustomizerController.prototype.getEmbroideryState = function (side) {
+    if (side === 'back' && this.state.backMode !== 'same') {
+      return {
+        text: this.state.backEmbroideryText,
+        templateId: this.state.backEmbroideryTemplateId,
+        templateLabel: this.state.backEmbroideryTemplateLabel,
+        color: this.state.backEmbroideryColor,
+        colorLabel: this.state.backEmbroideryColorLabel,
+        blob: this.state.backEmbroideryArtworkBlob
+      };
+    }
+    return {
+      text: this.state.embroideryText,
+      templateId: this.state.embroideryTemplateId,
+      templateLabel: this.state.embroideryTemplateLabel,
+      color: this.state.embroideryColor,
+      colorLabel: this.state.embroideryColorLabel,
+      blob: this.state.embroideryArtworkBlob
+    };
+  };
+
+  CustomizerController.prototype.setEmbroideryState = function (side, result) {
+    if (side === 'back') {
+      this.state.backEmbroideryText = result.text;
+      this.state.backEmbroideryTemplateId = result.templateId;
+      this.state.backEmbroideryTemplateLabel = result.templateLabel;
+      this.state.backEmbroideryColor = result.color;
+      this.state.backEmbroideryColorLabel = result.colorLabel;
+      this.state.backEmbroideryArtworkBlob = result.blob;
+      return;
+    }
+    this.state.embroideryText = result.text;
+    this.state.embroideryTemplateId = result.templateId;
+    this.state.embroideryTemplateLabel = result.templateLabel;
+    this.state.embroideryColor = result.color;
+    this.state.embroideryColorLabel = result.colorLabel;
+    this.state.embroideryArtworkBlob = result.blob;
+  };
+
+  CustomizerController.prototype.validateEmbroideryState = function (side) {
+    if (!this.isEmbroidery) return '';
+    var design = this.getEmbroideryState(side);
+    var text = String(design.text || '');
+    if (!text.trim()) return 'Masukkan teks Bordir sebelum melanjutkan.';
+    if (Array.from(text).length > EMBROIDERY_TEXT_MAX_LENGTH) {
+      return 'Teks Bordir maksimal 12 karakter, termasuk spasi.';
+    }
+    if (!design.templateId) return 'Pilih template Bordir sebelum melanjutkan.';
+    if (!design.color) return 'Pilih warna benang sebelum melanjutkan.';
+    if (!design.blob) return 'Konfirmasi ulang desain Bordir sebelum melanjutkan.';
+    return '';
+  };
+
+  CustomizerController.prototype.embroideryObjectMeta = function (side) {
+    var design = this.getEmbroideryState(side);
+    return {
+      text: design.text,
+      templateId: design.templateId,
+      color: design.color
+    };
+  };
+
+  CustomizerController.prototype.openEmbroideryBuilder = function (side) {
+    if (!this.isEmbroidery || !this.embroideryBuilder) return;
+    side = side === 'back' ? 'back' : 'front';
+    this.state.editingSide = side;
+    var mockupSide = this.loader.config.surfaceMode === 'wrap' ? 'wrap' : side;
+    this.showStep('embroidery');
+    this.embroideryBuilder.open({
+      side: side,
+      state: this.getEmbroideryState(side),
+      mockupUrl: this.mockups.get(this.state.variantId, mockupSide)
+    });
+  };
+
+  CustomizerController.prototype.editEmbroideryDesign = function () {
+    if (!this.isEmbroidery) return;
+    this.pendingEmbroideryTransform = this.canvasEditor.captureEmbroideryTransform();
+    this.editingEmbroideryPlacement = true;
+    this.openEmbroideryBuilder(this.state.editingSide);
+  };
+
+  CustomizerController.prototype.confirmEmbroideryDesign = async function (result) {
+    if (!this.isEmbroidery) return;
+    var side = result.side === 'back' ? 'back' : 'front';
+    this.setEmbroideryState(side, result);
+
+    if (this.editingEmbroideryPlacement && this.canvasEditor.canvas && this.canvasEditor.side === side) {
+      var transform = this.pendingEmbroideryTransform;
+      this.pendingEmbroideryTransform = null;
+      this.editingEmbroideryPlacement = false;
+      this.showStep('editor');
+      await this.canvasEditor.replaceEmbroidery(result.blob, this.embroideryObjectMeta(side), transform);
+      this.renderEditorZones();
+      this.updateEditorLabels(side, this.canvasEditor.getActiveZone());
+      this.setStatus(transform
+        ? 'Desain Bordir diperbarui. Posisi, ukuran, dan rotasi dipertahankan.'
+        : 'Desain Bordir ditambahkan kembali ke area yang dipilih.');
+      return;
+    }
+
+    this.pendingEmbroideryTransform = null;
+    this.editingEmbroideryPlacement = false;
+    if (side === 'back') this.renderBackZonePicker();
+    else this.goToZones();
+  };
+
   CustomizerController.prototype.getFrontZones = function () {
     return this.loader.config.front.zones || [];
   };
 
   CustomizerController.prototype.goToZones = function () {
     var zones = this.getFrontZones();
+    var embroideryError = this.validateEmbroideryState('front');
+    if (embroideryError) {
+      this.setStatus(embroideryError, true);
+      if (this.isEmbroidery) this.openEmbroideryBuilder('front');
+      return;
+    }
     if (!zones.length) {
-      this.setStatus('No front print zone is configured in customizer.config.', true);
+      this.setStatus(this.isEmbroidery
+        ? 'Belum ada area Bordir depan di customizer.config.'
+        : 'No front print zone is configured in customizer.config.', true);
       return;
     }
     var seenZoneIds = new Set();
@@ -1186,7 +1569,9 @@
       return false;
     });
     if (invalidZone) {
-      this.setStatus('Every front print zone must have a unique id in customizer.config.', true);
+      this.setStatus(this.isEmbroidery
+        ? 'Setiap area Bordir depan harus memiliki id unik di customizer.config.'
+        : 'Every front print zone must have a unique id in customizer.config.', true);
       return;
     }
 
@@ -1208,7 +1593,7 @@
       var title = document.createElement('strong');
       var physical = document.createElement('small');
       var price = document.createElement('span');
-      input.type = 'checkbox';
+      input.type = self.isEmbroidery ? 'radio' : 'checkbox';
       input.name = 'customizer-zones-' + self.root.dataset.sectionId;
       input.value = String(zone.id);
       input.checked = selectedIds.has(String(zone.id));
@@ -1222,7 +1607,7 @@
       label.appendChild(copy);
       label.appendChild(price);
       input.addEventListener('change', function () {
-        if (input.checked) {
+        if (input.checked && !self.isEmbroidery) {
           var conflict = self.state.frontZones.find(function (selected) {
             return self.zonesOverlap(zone, selected);
           });
@@ -1248,6 +1633,7 @@
         self.state.frontArtworks = {};
         self.state.frontCompositeArtwork = null;
         self.state.frontPreview = null;
+        self.state.frontDesignSummary = null;
         self.updateZoneSelectionSummary();
       });
       container.appendChild(label);
@@ -1269,15 +1655,15 @@
     var zones = this.state.frontZones;
     var fee = zones.reduce(function (total, zone) { return total + Number(zone.price || 0); }, 0);
     summary.textContent = message || (zones.length
-      ? zones.length + (zones.length === 1 ? ' area' : ' areas') + ' selected · ' + formatCurrency(fee, this.loader.product.currency)
-      : 'Select at least one print area.');
+      ? (this.isEmbroidery ? '1 area Bordir dipilih · ' : zones.length + (zones.length === 1 ? ' area' : ' areas') + ' selected · ') + formatCurrency(fee, this.loader.product.currency)
+      : (this.isEmbroidery ? 'Pilih setidaknya satu area Bordir.' : 'Select at least one print area.'));
     summary.classList.toggle('is-error', Boolean(isError));
     this.root.querySelector('[data-zone-continue]').disabled = zones.length === 0;
   };
 
   CustomizerController.prototype.zonePhysicalLabel = function (zone) {
     if (zone.printWidthMm && zone.printHeightMm) return zone.printWidthMm + ' × ' + zone.printHeightMm + ' mm';
-    return 'Custom print area';
+    return this.isEmbroidery ? 'Area Bordir' : 'Custom print area';
   };
 
   CustomizerController.prototype.openFrontEditor = async function () {
@@ -1287,6 +1673,13 @@
     this.showStep('editor');
     if (this.canvasEditor.canvas && this.canvasEditor.side === 'front' && this.canvasEditor.mockup) {
       this.canvasEditor.setZones(this.state.frontZones);
+      if (this.isEmbroidery && !this.canvasEditor.getEmbroideryObject()) {
+        await this.canvasEditor.replaceEmbroidery(
+          this.state.embroideryArtworkBlob,
+          this.embroideryObjectMeta('front'),
+          null
+        );
+      }
       this.updateEditorLabels('front', this.canvasEditor.getActiveZone());
       this.updatePrices();
       this.renderEditorZones();
@@ -1297,6 +1690,7 @@
 
   CustomizerController.prototype.getAvailableBackZones = function () {
     var back = this.loader.config.back;
+    if (back && back.enabled === false) return [];
     if (back && Array.isArray(back.zones) && back.zones.length) {
       return back.zones.map(function (zone, index) {
         return Object.assign({ id: 'back-' + (index + 1), label: 'Area ' + (index + 1), _explicitBackZone: true }, zone);
@@ -1379,6 +1773,22 @@
     return this.getAvailableBackZones().length > 0;
   };
 
+  CustomizerController.prototype.isBackPrintDisabled = function () {
+    var back = this.loader.config.back;
+    return Boolean(back && back.enabled === false);
+  };
+
+  CustomizerController.prototype.updateBackChoice = function (backAvailable) {
+    var addBackButton = this.root.querySelector('[data-add-back]');
+    var frontOnlyButton = this.root.querySelector('[data-front-only]');
+    var frontOnlyLabel = this.root.querySelector('[data-front-only-label]');
+    var choiceGrid = frontOnlyButton && frontOnlyButton.parentElement;
+
+    if (addBackButton) addBackButton.hidden = !backAvailable;
+    if (frontOnlyLabel) frontOnlyLabel.textContent = backAvailable ? 'Continue Front Only' : 'Done';
+    if (choiceGrid) choiceGrid.classList.toggle('is-single-choice', !backAvailable);
+  };
+
   CustomizerController.prototype.loadEditorSurface =
   async function (side, zones, insertFrontArtwork) {
 
@@ -1447,6 +1857,15 @@
         } else if (this.state.frontCompositeArtwork) {
           await this.canvasEditor.addBlobImage(this.state.frontCompositeArtwork, 'flattened-front');
         }
+      } else if (this.isEmbroidery) {
+        var embroideryDesign = this.getEmbroideryState(side);
+        var embroideryError = this.validateEmbroideryState(side);
+        if (embroideryError) throw new Error(embroideryError);
+        await this.canvasEditor.replaceEmbroidery(
+          embroideryDesign.blob,
+          this.embroideryObjectMeta(side),
+          null
+        );
       }
 
       this.renderEditorZones();
@@ -1480,16 +1899,21 @@
   };
 
   CustomizerController.prototype.updateEditorLabels = function (side, zone) {
-    this.root.querySelector('[data-editor-side-label]').textContent = side === 'back' ? 'Back' : 'Front';
+    this.root.querySelector('[data-editor-side-label]').textContent = this.isEmbroidery
+      ? (side === 'back' ? 'Bordir Belakang' : 'Bordir Depan')
+      : (side === 'back' ? 'Back' : 'Front');
     this.root.querySelector('[data-editor-zone-label]').textContent = zone ? '· ' + (zone.label || zone.id || 'Main') : '';
     var fee = side === 'back'
       ? this.state.backZones.reduce(function (total, backZone) { return total + Number(backZone.price || 0); }, 0)
       : this.state.frontZones.reduce(function (total, frontZone) { return total + Number(frontZone.price || 0); }, 0);
-    this.root.querySelector('[data-editor-price]').textContent = formatCurrency(fee, this.loader.product.currency) + ' print fee';
+    this.root.querySelector('[data-editor-price]').textContent = formatCurrency(fee, this.loader.product.currency) +
+      (this.isEmbroidery ? ' biaya Bordir' : ' print fee');
     this.root.querySelectorAll('[data-editor-finish]').forEach(function (button) {
-      button.textContent = side === 'back' ? 'Finish Back' : 'Finish Front';
-    });
-    this.root.querySelector('[data-tool-character]').disabled = !this.state.characterBlob;
+      button.textContent = this.isEmbroidery
+        ? (side === 'back' ? 'Selesai Bordir Belakang' : 'Selesai Bordir Depan')
+        : (side === 'back' ? 'Finish Back' : 'Finish Front');
+    }, this);
+    this.root.querySelector('[data-tool-character]').disabled = this.isEmbroidery || !this.state.characterBlob;
   };
 
   CustomizerController.prototype.renderEditorZones = function () {
@@ -1519,30 +1943,75 @@
     var backLabel = backZones.map(function (zone) { return (zone.label || zone.id).replace(/^Back\s*·\s*/, ''); }).join(', ');
 
     this.root.querySelector('[data-price-product]').textContent = formatCurrency(summary.base, currency);
-    this.root.querySelector('[data-price-front-label]').textContent = 'Front · ' + label;
+    this.root.querySelector('[data-price-front-label]').textContent = (this.isEmbroidery ? 'Bordir depan · ' : 'Front · ') + label;
     this.root.querySelector('[data-price-front]').textContent = formatCurrency(summary.front, currency);
     this.root.querySelector('[data-price-back-row]').hidden = !this.state.hasBack;
-    this.root.querySelector('[data-price-back-label]').textContent = backLabel ? 'Back · ' + backLabel : 'Back print';
+    this.root.querySelector('[data-price-back-label]').textContent = backLabel
+      ? (this.isEmbroidery ? 'Bordir belakang · ' : 'Back · ') + backLabel
+      : (this.isEmbroidery ? 'Bordir belakang' : 'Back print');
     this.root.querySelector('[data-price-back]').textContent = formatCurrency(summary.back, currency);
     this.root.querySelector('[data-price-total]').textContent = formatCurrency(summary.total, currency);
 
     this.root.querySelector('[data-review-product-price]').textContent = formatCurrency(summary.base, currency);
-    this.root.querySelector('[data-review-front-label]').textContent = 'Front · ' + label;
+    this.root.querySelector('[data-review-front-label]').textContent = (this.isEmbroidery ? 'Bordir depan · ' : 'Front · ') + label;
     this.root.querySelector('[data-review-front-price]').textContent = formatCurrency(summary.front, currency);
     this.root.querySelector('[data-review-back-price-row]').hidden = !this.state.hasBack;
-    this.root.querySelector('[data-review-back-label]').textContent = backLabel ? 'Back · ' + backLabel : 'Back print';
+    this.root.querySelector('[data-review-back-label]').textContent = backLabel
+      ? (this.isEmbroidery ? 'Bordir belakang · ' : 'Back · ') + backLabel
+      : (this.isEmbroidery ? 'Bordir belakang' : 'Back print');
     this.root.querySelector('[data-review-back-price]').textContent = formatCurrency(summary.back, currency);
     this.root.querySelector('[data-review-total]').textContent = formatCurrency(summary.total, currency);
   };
 
   CustomizerController.prototype.addCharacterToEditor = async function () {
+    if (this.isEmbroidery) return;
     if (!this.state.characterBlob) return;
     try { await this.canvasEditor.addCharacter(this.state.characterBlob); }
     catch (error) { this.setStatus(error.message, true); }
   };
 
+  CustomizerController.prototype.openStickerPicker = function () {
+    if (this.isEmbroidery) return;
+    var grid = this.root.querySelector('[data-sticker-grid]');
+    var empty = this.root.querySelector('[data-sticker-empty]');
+    grid.innerHTML = '';
+    this.stickers.forEach(function (sticker, index) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'customizer-sticker-card';
+      button.dataset.stickerIndex = String(index);
+      var image = document.createElement('img');
+      image.src = sticker.image;
+      image.alt = '';
+      var label = document.createElement('span');
+      label.textContent = sticker.name || 'Sticker';
+      button.appendChild(image);
+      button.appendChild(label);
+      grid.appendChild(button);
+    });
+    empty.hidden = this.stickers.length > 0;
+    this.root.querySelector('[data-sticker-dialog]').hidden = false;
+  };
+
+  CustomizerController.prototype.closeStickerPicker = function () {
+    this.root.querySelector('[data-sticker-dialog]').hidden = true;
+  };
+
+  CustomizerController.prototype.addStickerToEditor = async function (index) {
+    if (this.isEmbroidery) return;
+    var sticker = this.stickers[index];
+    if (!sticker) return;
+    this.closeStickerPicker();
+    try {
+      await this.canvasEditor.addSticker(sticker.image);
+    } catch (error) {
+      this.setStatus(error.message, true);
+    }
+  };
+
   CustomizerController.prototype.addText = function () {
-  var text = this.canvasEditor.addText('Your text');
+  if (this.isEmbroidery) return null;
+  var text = this.canvasEditor.addText(truncateText('Your text', this.textMaxLength));
 
   if (this._syncTextControls) {
     this._syncTextControls();
@@ -1562,7 +2031,57 @@
   return text;
 };
 
+  CustomizerController.prototype.captureCurrentDesignSummary = function () {
+    var objects = this.canvasEditor.getDesignObjects();
+    return {
+      objectTypes: objects.map(function (object) {
+        if (object._customizerObjectType) return object._customizerObjectType;
+        return object.type === 'i-text' || object.type === 'text' ? 'text' : (object.type || 'unknown');
+      }),
+      textValues: objects.filter(function (object) {
+        return object.type === 'i-text' || object.type === 'text' || object._customizerObjectType === 'text';
+      }).map(function (object) { return String(object.text || ''); })
+    };
+  };
+
+  CustomizerController.prototype.validateDesignSummary = function (summary, sideLabel) {
+    if (!summary) return (sideLabel || 'Design') + ' must be finished again before it can be added to cart.';
+
+    if (this.isEmbroidery) {
+      var unsupportedType = summary.objectTypes.find(function (type) { return type !== 'embroidery'; });
+      if (unsupportedType) return 'Mode Bordir hanya mengizinkan satu artwork dari Design Bordir.';
+      if (summary.objectTypes.length > 1) return 'Hanya satu artwork Bordir yang dapat aktif pada setiap sisi.';
+    }
+
+    var tooLong = summary.textValues.find(function (value) {
+      return String(value).length > this.textMaxLength;
+    }, this);
+    if (tooLong != null) {
+      return this.isEmbroidery
+        ? 'Setiap teks Bordir maksimal 12 karakter, termasuk spasi.'
+        : 'Each text object is limited to 120 characters.';
+    }
+    return '';
+  };
+
+  CustomizerController.prototype.validateFinishedDesigns = function () {
+    var embroideryError = this.validateEmbroideryState('front');
+    if (embroideryError) return embroideryError;
+    var frontError = this.validateDesignSummary(this.state.frontDesignSummary, 'Front design');
+    if (frontError) return frontError;
+    if (this.state.hasBack) {
+      embroideryError = this.validateEmbroideryState('back');
+      if (embroideryError) return embroideryError;
+      return this.validateDesignSummary(this.state.backDesignSummary, 'Back design');
+    }
+    return '';
+  };
+
   CustomizerController.prototype.addUploadedImage = async function (event) {
+    if (this.isEmbroidery) {
+      event.target.value = '';
+      return;
+    }
     var file = event.target.files && event.target.files[0];
     event.target.value = '';
     if (!file) return;
@@ -1620,6 +2139,7 @@
   };
 
   CustomizerController.prototype.promptFrame = async function () {
+    if (this.isEmbroidery) return;
     var self = this;
     try {
       var shape = await this.chooseFrameShape();
@@ -1641,12 +2161,14 @@
 
   CustomizerController.prototype.editorBack = function () {
     if (this.state.editingSide === 'back') {
-      if (this.state.backMode === 'different') this.renderBackZonePicker();
+      if (this.isEmbroidery && this.state.backMode === 'different') this.editEmbroideryDesign();
+      else if (this.state.backMode === 'different') this.renderBackZonePicker();
       else this.showStep('back-mode');
     } else {
       // A single-zone product skips the zone screen on the way forward.
       // Going back must not immediately auto-forward into the editor again.
-      if (this.getFrontZones().length > 1) this.goToZones();
+      if (this.isEmbroidery && this.getFrontZones().length === 1) this.editEmbroideryDesign();
+      else if (this.getFrontZones().length > 1) this.goToZones();
       else this.showStep('character');
     }
   };
@@ -1657,12 +2179,26 @@
   };
 
   CustomizerController.prototype.finishFront = function () {
+    var embroideryError = this.validateEmbroideryState('front');
+    if (embroideryError) {
+      this.setStatus(embroideryError, true);
+      return;
+    }
+    var designSummary = this.captureCurrentDesignSummary();
+    var validationError = this.validateDesignSummary(designSummary, 'Front design');
+    if (validationError) {
+      this.setStatus(validationError, true);
+      return;
+    }
     var emptyZones = this.canvasEditor.getEmptyZones();
     if (emptyZones.length) {
       this.canvasEditor.setActiveZone(emptyZones[0].id);
       this.setStatus(
-        'Add artwork to ' + emptyZones.map(function (zone) { return zone.label || zone.id; }).join(', ') +
-        ' or go back and remove the empty print area.',
+        this.isEmbroidery
+          ? 'Tambahkan kembali desain Bordir ke ' + emptyZones.map(function (zone) { return zone.label || zone.id; }).join(', ') +
+            ' atau kembali dan hapus area yang kosong.'
+          : 'Add artwork to ' + emptyZones.map(function (zone) { return zone.label || zone.id; }).join(', ') +
+            ' or go back and remove the empty print area.',
         true
       );
       return;
@@ -1679,18 +2215,28 @@
       }, this);
       this.state.frontCompositeArtwork = this.canvasEditor.exportCompositeArtwork('front-composite-' + id + '.png');
       this.state.frontPreview = this.canvasEditor.exportPreview('preview-front-' + id + '.png');
+      this.state.frontDesignSummary = designSummary;
       var finishedPreview = this.root.querySelector('[data-front-finished-preview]');
       finishedPreview.src = this.trackUrl(blobUrl(this.state.frontPreview));
       showClientWatermark(finishedPreview);
 
-      if (this.isBackPrintAvailable()) {
+      var backAvailable = this.isBackPrintAvailable();
+      this.updateBackChoice(backAvailable);
+      if (backAvailable) {
         var sameBackZones = this.getSameBackZones();
         var sameBackFee = sameBackZones.reduce(function (total, zone) { return total + Number(zone.price || 0); }, 0);
-        this.root.querySelector('[data-back-price-message]').textContent =
-          'Copy the Front design to the Back for +' + formatCurrency(sameBackFee, this.loader.product.currency) +
-          ', or choose different Back positions and pricing.';
+        this.root.querySelector('[data-back-price-message]').textContent = this.isEmbroidery
+          ? 'Salin Bordir depan ke belakang dengan biaya +' + formatCurrency(sameBackFee, this.loader.product.currency) +
+            ', atau pilih posisi dan desain Bordir belakang yang berbeda.'
+          : 'Copy the Front design to the Back for +' + formatCurrency(sameBackFee, this.loader.product.currency) +
+            ', or choose different Back positions and pricing.';
         var backDescription = this.root.querySelector('[data-back-choice-description]');
-        if (backDescription) backDescription.textContent = 'Choose an identical locked copy or design selected Back positions separately.';
+        if (backDescription) backDescription.textContent = this.isEmbroidery
+          ? 'Pilih salinan Bordir yang identik atau desain posisi belakang secara terpisah.'
+          : 'Choose an identical locked copy or design selected Back positions separately.';
+        this.showStep('back-choice');
+      } else if (this.isBackPrintDisabled()) {
+        this.root.querySelector('[data-back-price-message]').textContent = '';
         this.showStep('back-choice');
       } else {
         this.state.hasBack = false;
@@ -1708,14 +2254,18 @@
     this.state.backArtworks = {};
     this.state.backCompositeArtwork = null;
     this.state.backPreview = null;
+    this.state.backDesignSummary = null;
     this.goReview();
   };
 
   CustomizerController.prototype.chooseAddBack = function () {
+    if (!this.isBackPrintAvailable()) return;
     var backZones = this.getAvailableBackZones();
     var backMockup = this.mockups.get(this.state.variantId, 'back');
     if (!backZones.length) {
-      this.setStatus('A print zone must be selected before designing the back.', true);
+      this.setStatus(this.isEmbroidery
+        ? 'Pilih area Bordir sebelum mendesain sisi belakang.'
+        : 'A print zone must be selected before designing the back.', true);
       return;
     }
     if (!backMockup) {
@@ -1743,6 +2293,7 @@
     this.state.backArtworks = {};
     this.state.backCompositeArtwork = null;
     this.state.backPreview = null;
+    this.state.backDesignSummary = null;
     this.state.hasBack = true;
     this.state.editingSide = 'back';
     this.setStatus('');
@@ -1756,6 +2307,12 @@
           'print-back-' + safeFilePart(zone._derivedFromFrontZone) + '-' + this.state.designId + '.png'
         );
       }, this);
+      this.state.backDesignSummary = this.state.frontDesignSummary
+        ? {
+            objectTypes: this.state.frontDesignSummary.objectTypes.slice(),
+            textValues: this.state.frontDesignSummary.textValues.slice()
+          }
+        : null;
       var loaded = await this.loadEditorSurface('back', backZones, true);
       if (!loaded) throw new Error('The identical Back preview could not be prepared. Please try again.');
       this.state.backCompositeArtwork = this.canvasEditor.exportCompositeArtwork('back-composite-' + this.state.designId + '.png');
@@ -1766,6 +2323,7 @@
       this.state.backArtworks = {};
       this.state.backCompositeArtwork = null;
       this.state.backPreview = null;
+      this.state.backDesignSummary = null;
       this.showStep('back-mode');
       this.setStatus(error.message, true);
     } finally {
@@ -1783,14 +2341,33 @@
       this.state.backArtworks = {};
       this.state.backCompositeArtwork = null;
       this.state.backPreview = null;
+      this.state.backDesignSummary = null;
+      this.state.backEmbroideryText = '';
+      this.state.backEmbroideryTemplateId = null;
+      this.state.backEmbroideryTemplateLabel = null;
+      this.state.backEmbroideryColor = null;
+      this.state.backEmbroideryColorLabel = null;
+      this.state.backEmbroideryArtworkBlob = null;
       this.canvasEditor.dispose();
       this._selectionBound = false;
     }
-    this.renderBackZonePicker();
+    if (this.isEmbroidery) this.openEmbroideryBuilder('back');
+    else this.renderBackZonePicker();
   };
 
   CustomizerController.prototype.renderBackZonePicker = function () {
     var zones = this.getAvailableBackZones();
+    var embroideryError = this.validateEmbroideryState('back');
+    if (embroideryError) {
+      this.setStatus(embroideryError, true);
+      if (this.isEmbroidery) this.openEmbroideryBuilder('back');
+      return;
+    }
+    if (this.isEmbroidery && zones.length === 1) {
+      this.state.backZones = [zones[0]];
+      this.openBackEditor();
+      return;
+    }
     var container = this.root.querySelector('[data-back-zone-options]');
     var selectedIds = new Set(this.state.backZones.map(function (zone) { return String(zone.id); }));
     var self = this;
@@ -1804,7 +2381,7 @@
       var title = document.createElement('strong');
       var physical = document.createElement('small');
       var price = document.createElement('span');
-      input.type = 'checkbox';
+      input.type = self.isEmbroidery ? 'radio' : 'checkbox';
       input.name = 'customizer-back-zones-' + self.root.dataset.sectionId;
       input.value = String(zone.id);
       input.checked = selectedIds.has(String(zone.id));
@@ -1819,7 +2396,7 @@
       label.appendChild(price);
 
       input.addEventListener('change', function () {
-        if (input.checked) {
+        if (input.checked && !self.isEmbroidery) {
           var conflict = self.state.backZones.find(function (selected) { return self.zonesOverlap(zone, selected); });
           if (conflict) {
             input.checked = false;
@@ -1843,6 +2420,7 @@
         self.state.backArtworks = {};
         self.state.backCompositeArtwork = null;
         self.state.backPreview = null;
+        self.state.backDesignSummary = null;
         if (self.canvasEditor.canvas && self.canvasEditor.side === 'back') self.canvasEditor.setZones(self.state.backZones);
         self.updateBackZoneSelectionSummary();
       });
@@ -1857,9 +2435,9 @@
     var summary = this.root.querySelector('[data-back-zone-selection-summary]');
     var fee = this.state.backZones.reduce(function (total, zone) { return total + Number(zone.price || 0); }, 0);
     summary.textContent = message || (this.state.backZones.length
-      ? this.state.backZones.length + (this.state.backZones.length === 1 ? ' area' : ' areas') + ' selected · ' +
+      ? (this.isEmbroidery ? '1 area Bordir dipilih · ' : this.state.backZones.length + (this.state.backZones.length === 1 ? ' area' : ' areas') + ' selected · ') +
         formatCurrency(fee, this.loader.product.currency)
-      : 'Select at least one Back print area.');
+      : (this.isEmbroidery ? 'Pilih setidaknya satu area Bordir belakang.' : 'Select at least one Back print area.'));
     summary.classList.toggle('is-error', Boolean(isError));
     this.root.querySelector('[data-back-zone-continue]').disabled = this.state.backZones.length === 0;
   };
@@ -1871,6 +2449,14 @@
     this.showStep('editor');
     if (this.canvasEditor.canvas && this.canvasEditor.side === 'back' && this.canvasEditor.mockup) {
       this.canvasEditor.setZones(this.state.backZones);
+      if (this.isEmbroidery && !this.canvasEditor.getEmbroideryObject()) {
+        var embroidery = this.getEmbroideryState('back');
+        await this.canvasEditor.replaceEmbroidery(
+          embroidery.blob,
+          this.embroideryObjectMeta('back'),
+          null
+        );
+      }
       this.updateEditorLabels('back', this.canvasEditor.getActiveZone());
       this.updatePrices();
       this.renderEditorZones();
@@ -1880,12 +2466,27 @@
   };
 
   CustomizerController.prototype.finishBack = function () {
+    var embroideryError = this.validateEmbroideryState('back');
+    if (embroideryError) {
+      this.setStatus(embroideryError, true);
+      return;
+    }
+    var designSummary = this.captureCurrentDesignSummary();
+    var validationError = this.validateDesignSummary(designSummary, 'Back design');
+    if (validationError) {
+      this.setStatus(validationError, true);
+      return;
+    }
     var emptyZones = this.canvasEditor.getEmptyZones();
     if (emptyZones.length) {
       this.canvasEditor.setActiveZone(emptyZones[0].id);
-      this.setStatus('Add artwork to every back print area before finishing: ' + emptyZones.map(function (zone) {
-        return (zone.label || zone.id).replace(/^Back\s*·\s*/, '');
-      }).join(', ') + '.', true);
+      this.setStatus(this.isEmbroidery
+        ? 'Tambahkan kembali desain ke area Bordir belakang sebelum selesai: ' + emptyZones.map(function (zone) {
+            return (zone.label || zone.id).replace(/^Back\s*·\s*/, '');
+          }).join(', ') + '.'
+        : 'Add artwork to every back print area before finishing: ' + emptyZones.map(function (zone) {
+            return (zone.label || zone.id).replace(/^Back\s*·\s*/, '');
+          }).join(', ') + '.', true);
       return;
     }
     try {
@@ -1901,6 +2502,7 @@
       }, this);
       this.state.backCompositeArtwork = this.canvasEditor.exportCompositeArtwork('back-composite-' + id + '.png');
       this.state.backPreview = this.canvasEditor.exportPreview('preview-back-' + id + '.png');
+      this.state.backDesignSummary = designSummary;
       this.goReview();
     } catch (error) {
       this.setStatus(error.message, true);
@@ -1908,6 +2510,12 @@
   };
 
   CustomizerController.prototype.goReview = function () {
+    var embroideryError = this.validateEmbroideryState('front');
+    if (!embroideryError && this.state.hasBack) embroideryError = this.validateEmbroideryState('back');
+    if (embroideryError) {
+      this.setStatus(embroideryError, true);
+      return;
+    }
     if (Object.keys(this.state.frontArtworks).length !== this.state.frontZones.length || !this.state.frontPreview) return;
     if (this.state.hasBack && (
       !this.state.backZones.length ||
@@ -1927,6 +2535,12 @@
     } else {
       backWrap.hidden = true;
       this.root.querySelector('[data-review-back]').removeAttribute('src');
+    }
+    if (this.isEmbroidery) {
+      var embroidery = this.getEmbroideryState('front');
+      this.root.querySelector('[data-review-embroidery-text]').textContent = embroidery.text || '—';
+      this.root.querySelector('[data-review-embroidery-template]').textContent = embroidery.templateLabel || embroidery.templateId || '—';
+      this.root.querySelector('[data-review-embroidery-color]').textContent = embroidery.colorLabel || embroidery.color || '—';
     }
     this.updatePrices();
     this.setStatus('');
@@ -1948,6 +2562,11 @@
     var button = this.root.querySelector('[data-add-to-cart]');
     if (this.isProcessing) return;
     if (!this.state.frontZones.length || !this.state.frontPreview || !this.state.frontCompositeArtwork) return;
+    var validationError = this.validateFinishedDesigns();
+    if (validationError) {
+      this.setStatus(validationError, true);
+      return;
+    }
     var missingArtwork = this.state.frontZones.find(function (zone) {
       return !this.state.frontArtworks[String(zone.id)];
     }, this);
@@ -1974,8 +2593,14 @@
       return;
     }
 
-    this.setProcessing(true, 'Adding your custom product…', 'Please wait. Don’t close this window.');
-    this.setStatus('Uploading design files and adding the custom bundle to Shopify cart…');
+    this.setProcessing(
+      true,
+      this.isEmbroidery ? 'Menambahkan produk Bordir…' : 'Adding your custom product…',
+      this.isEmbroidery ? 'Mohon tunggu. Jangan tutup jendela ini.' : 'Please wait. Don’t close this window.'
+    );
+    this.setStatus(this.isEmbroidery
+      ? 'Mengunggah desain Bordir dan menambahkan bundle ke keranjang Shopify…'
+      : 'Uploading design files and adding the custom bundle to Shopify cart…');
 
     try {
       if (!window.CustomDesignStorage) throw new Error('Design storage is unavailable. Nothing was added to the cart.');
@@ -1993,12 +2618,24 @@
         backZones: backZones,
         hasBack: this.state.hasBack,
         backMode: this.state.backMode,
+        customizationType: this.customizationType,
+        embroideryText: this.state.embroideryText,
+        embroideryTemplate: this.state.embroideryTemplateId,
+        embroideryTemplateLabel: this.state.embroideryTemplateLabel,
+        embroideryColor: this.state.embroideryColor,
+        embroideryColorLabel: this.state.embroideryColorLabel,
         previewFront: this.state.frontPreview,
         frontArtworks: this.state.frontArtworks,
         previewBack: this.state.backPreview,
         backArtworks: this.state.backArtworks
       });
-      this.setStatus('Custom product added to cart. Your finalized design is stored securely.', false, true);
+      this.setStatus(
+        this.isEmbroidery
+          ? 'Produk Bordir ditambahkan ke keranjang. Desain final tersimpan dengan aman.'
+          : 'Custom product added to cart. Your finalized design is stored securely.',
+        false,
+        true
+      );
       document.dispatchEvent(new CustomEvent('customizer:cart-updated', { detail: { designId: this.state.designId } }));
       setTimeout(function () {
         window.location.href = ((window.Shopify && Shopify.routes && Shopify.routes.root) || '/') + 'cart';

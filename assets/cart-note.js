@@ -29,10 +29,11 @@ class CartNote extends Component {
         body: JSON.stringify({ note }),
       });
 
-      await fetch(Theme.routes.cart_update_url, {
+      const response = await fetch(Theme.routes.cart_update_url, {
         ...config,
         signal: abortController.signal,
       });
+      if (response.ok) document.dispatchEvent(new CustomEvent('dikado:cart-mutated'));
     } catch (error) {
     } finally {
       this.#activeFetch = null;

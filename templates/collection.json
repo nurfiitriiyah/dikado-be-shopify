@@ -99,6 +99,107 @@
         "padding-block-end": 48
       }
     },
+    "layered_slideshow_tUJz9r": {
+      "type": "layered-slideshow",
+      "blocks": {
+        "layered_slide_VnjBA4": {
+          "type": "_layered-slide",
+          "settings": {
+            "media_type_1": "image",
+            "image_1": "shopify://shop_images/ChatGPT_Image_Aug_25_2026_03_54_33_PM.png",
+            "content_direction": "column",
+            "vertical_on_mobile": true,
+            "horizontal_alignment": "flex-start",
+            "vertical_alignment": "center",
+            "align_baseline": false,
+            "horizontal_alignment_flex_direction_column": "flex-start",
+            "vertical_alignment_flex_direction_column": "flex-start",
+            "gap": 12,
+            "inherit_color_scheme": true,
+            "color_scheme": "",
+            "toggle_overlay": false,
+            "overlay_color": "#00000026",
+            "overlay_style": "solid",
+            "gradient_direction": "to top",
+            "padding-block-start": 32,
+            "padding-block-end": 32,
+            "padding-inline-start": 32,
+            "padding-inline-end": 32
+          },
+          "blocks": {
+            "text_ApBMqd": {
+              "type": "text",
+              "name": "t:names.heading",
+              "settings": {
+                "text": "<h2>New arrivals</h2>",
+                "width": "fit-content",
+                "max_width": "normal",
+                "alignment": "left",
+                "type_preset": "h2",
+                "font": "var(--font-body--family)",
+                "font_size": "1rem",
+                "line_height": "normal",
+                "letter_spacing": "normal",
+                "case": "none",
+                "wrap": "pretty",
+                "color": "var(--color-foreground)",
+                "background": false,
+                "background_color": "#00000026",
+                "corner_radius": 0,
+                "padding-block-start": 0,
+                "padding-block-end": 0,
+                "padding-inline-start": 0,
+                "padding-inline-end": 0
+              },
+              "blocks": {}
+            },
+            "text_BhQDgA": {
+              "type": "text",
+              "settings": {
+                "text": "<p>Introducing our latest products, made especially for the season. Shop your favorites before they're gone!</p>",
+                "width": "fit-content",
+                "max_width": "normal",
+                "alignment": "left",
+                "type_preset": "rte",
+                "font": "var(--font-body--family)",
+                "font_size": "1rem",
+                "line_height": "normal",
+                "letter_spacing": "normal",
+                "case": "none",
+                "wrap": "pretty",
+                "color": "var(--color-foreground)",
+                "background": false,
+                "background_color": "#00000026",
+                "corner_radius": 0,
+                "padding-block-start": 0,
+                "padding-block-end": 0,
+                "padding-inline-start": 0,
+                "padding-inline-end": 0
+              },
+              "blocks": {}
+            }
+          },
+          "block_order": [
+            "text_ApBMqd",
+            "text_BhQDgA"
+          ]
+        }
+      },
+      "block_order": [
+        "layered_slide_VnjBA4"
+      ],
+      "name": "t:names.layered_slideshow",
+      "settings": {
+        "section_width": "page-width",
+        "height": "small",
+        "corner_radius": 0,
+        "border_width": 1,
+        "drop_shadow": false,
+        "color_scheme": "",
+        "padding-block-start": 40,
+        "padding-block-end": 40
+      }
+    },
     "main": {
       "type": "main-collection",
       "blocks": {
@@ -145,7 +246,7 @@
             "card-gallery": {
               "type": "_product-card-gallery",
               "settings": {
-                "image_ratio": "adapt",
+                "image_ratio": "portrait",
                 "border": "none",
                 "border_width": 1,
                 "border_opacity": 100,
@@ -214,7 +315,7 @@
       },
       "settings": {
         "layout_type": "grid",
-        "product_card_size": "small",
+        "product_card_size": "medium",
         "mobile_product_card_size": "small",
         "enable_infinite_scroll": true,
         "products_per_page": 24,
@@ -232,6 +333,7 @@
   },
   "order": [
     "section",
+    "layered_slideshow_tUJz9r",
     "main"
   ]
 }

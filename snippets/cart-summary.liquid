@@ -253,12 +253,22 @@
   </div>
 </div>
 
+{% liquid
+  assign dikado_precheckout_page = pages['checkout-dikado']
+  if dikado_precheckout_page == blank
+    assign dikado_precheckout_page = pages['custom-chekout']
+  endif
+  assign dikado_precheckout_url = dikado_precheckout_page.url | default: '/pages/checkout-dikado'
+%}
+
 <div class="cart__ctas">
   <button
     type="submit"
     id="checkout"
     class="cart__checkout-button button"
     name="checkout"
+    formaction="{{ dikado_precheckout_url }}"
+    formmethod="get"
     {% if cart == empty %}
       disabled
     {% endif %}

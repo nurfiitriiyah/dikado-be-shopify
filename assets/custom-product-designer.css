@@ -4,11 +4,14 @@
 }
 
 .customizer-dialog {
-  position: relative;
+  position: fixed;
+  inset: 0;
+  margin: auto;
   width: min(1180px, calc(100vw - 24px));
   max-width: none;
   height: min(860px, calc(100dvh - 24px));
   max-height: none;
+  box-sizing: border-box;
   padding: 0;
   border: 0;
   border-radius: 22px;
@@ -64,7 +67,9 @@
 .customizer-shell {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .customizer-header {
@@ -111,9 +116,13 @@
 }
 
 .customizer-body {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
   background: #f8f5f3;
 }
 
@@ -165,6 +174,10 @@
   gap: 14px;
 }
 
+.customizer-choice-grid.is-single-choice {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .customizer-choice-card {
   min-height: 142px;
   padding: 22px;
@@ -174,6 +187,10 @@
   text-align: left;
   cursor: pointer;
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.customizer-choice-card[hidden] {
+  display: none;
 }
 
 .customizer-choice-card:hover,
@@ -464,12 +481,109 @@
 
 .customizer-canvas-wrap .canvas-container {
   max-width: 100%;
-  max-height: 68vh;
+  height: auto !important;
+  aspect-ratio: var(--customizer-canvas-aspect-ratio, 1 / 1);
 }
 
 .customizer-canvas-wrap canvas {
-  max-width: 100%;
-  height: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.customizer-sticker-dialog[hidden] {
+  display: none !important;
+}
+
+.customizer-sticker-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(36, 30, 48, 0.52);
+}
+
+.customizer-sticker-dialog-inner {
+  width: min(680px, 100%);
+  max-height: min(720px, calc(100vh - 36px));
+  overflow: auto;
+  padding: 22px;
+  border-radius: 22px;
+  background: #fffdfb;
+  box-shadow: 0 28px 80px rgba(36, 30, 48, 0.3);
+}
+
+.customizer-sticker-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.customizer-sticker-dialog-header span {
+  color: #786d74;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.customizer-sticker-dialog-header h3 {
+  margin: 3px 0 0;
+  color: #30262b;
+  font-size: 22px;
+}
+
+.customizer-sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.customizer-sticker-card {
+  appearance: none;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e6dce1;
+  border-radius: 15px;
+  background: #fff;
+  color: #30262b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.customizer-sticker-card:hover,
+.customizer-sticker-card:focus-visible {
+  border-color: #a55c7c;
+  outline: none;
+  box-shadow: 0 8px 20px rgba(105, 59, 80, 0.12);
+}
+
+.customizer-sticker-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #faf7f8;
+}
+
+.customizer-sticker-card span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customizer-sticker-empty {
+  margin: 30px 0;
+  color: #786d74;
+  text-align: center;
 }
 
 .customizer-loading {
@@ -843,6 +957,19 @@
 }
 
 @media (max-width: 640px) {
+  .customizer-sticker-dialog {
+    padding: 10px;
+  }
+
+  .customizer-sticker-dialog-inner {
+    max-height: calc(100dvh - 20px);
+    padding: 16px;
+  }
+
+  .customizer-sticker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .customizer-dialog {
     position: fixed;
     inset: 0;
@@ -887,7 +1014,7 @@
   .customizer-toolbar {
     position: static;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     order: 1;
     padding: 6px;
   }
@@ -920,7 +1047,7 @@
   .customizer-canvas-wrap .canvas-container {
     width: 100% !important;
     height: auto !important;
-    aspect-ratio: 1 / 1;
+    aspect-ratio: var(--customizer-canvas-aspect-ratio, 1 / 1);
   }
 
   .customizer-canvas-wrap .canvas-container canvas {
@@ -1041,4 +1168,7 @@
 
   background: #fff;
   padding: 7px 9px;
+}
+.customizer-dialog[data-customization-mode='embroidery'] [data-embroidery-unavailable] {
+  display: none !important;
 }
