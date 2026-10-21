@@ -28,6 +28,26 @@
   </script>
 {% endif %}
 
+{% comment %}
+  The checkout selector needs every cart line (including hidden print fees and
+  automatic hamper packaging) to preview the same total that will be kept by
+  cart-checkout-selection.js during checkout preparation.
+{% endcomment %}
+<script type="application/json" data-cart-checkout-prices>
+  [
+    {%- for item in cart.items -%}
+      {
+        "key": {{ item.key | json }},
+        "price": {{ item.final_line_price | json }},
+        "type": {{ item.properties['_item_type'] | json }},
+        "designId": {{ item.properties['_design_id'] | json }},
+        "hamperRole": {{ item.properties['_hamper_role'] | json }},
+        "hamperId": {{ item.properties['_hamper_id'] | json }}
+      }{% unless forloop.last %},{% endunless %}
+    {%- endfor -%}
+  ]
+</script>
+
 <script
   src="{{ 'component-cart-items.js' | asset_url }}"
   type="module"

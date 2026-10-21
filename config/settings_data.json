@@ -10,12 +10,12 @@
 {
   "current": {
     "hamper_packaging_product": "packaging",
-    "hamper_box_base": "shopify://shop_images/5d558a80-8a69-4ada-a4f6-261fe2de22d6.png",
-    "hamper_ribbon_pink": "shopify://shop_images/ribbon_bibi1.png",
-    "hamper_ribbon_purple": "shopify://shop_images/bow.png",
-    "hamper_ribbon_red": "shopify://shop_images/bow.png",
-    "hamper_ribbon_navy": "shopify://shop_images/bow.png",
-    "hamper_ribbon_cream": "shopify://shop_images/bow.png",
+    "hamper_box_base": "shopify://shop_images/red.png",
+    "hamper_ribbon_pink": "shopify://shop_images/pink_701791bf-08a7-4430-8d6a-613172d91b89.png",
+    "hamper_ribbon_purple": "shopify://shop_images/purple.png",
+    "hamper_ribbon_red": "shopify://shop_images/red.png",
+    "hamper_ribbon_navy": "shopify://shop_images/navy.png",
+    "hamper_ribbon_cream": "shopify://shop_images/beige.png",
     "logo": "shopify://shop_images/logov1_c9e8253e-bf73-46c5-a2b1-e9d14a3feab8.png",
     "logo_height": 43,
     "logo_height_mobile": 28,
@@ -92,11 +92,6 @@
     "blocks": {
       "14060646107696862457": {
         "type": "shopify://apps/judge-me-reviews/blocks/judgeme_core/61ccd3b1-a9f2-4160-9fe9-4fec8413e5d8",
-        "disabled": false,
-        "settings": {}
-      },
-      "11348531219507317188": {
-        "type": "shopify://apps/eb-easy-bundle-builder/blocks/app-embed/05b1325c-6303-4da5-8e2f-b13ab2a50e1a",
         "disabled": false,
         "settings": {}
       }

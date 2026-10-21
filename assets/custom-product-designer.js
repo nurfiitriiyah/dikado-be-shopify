@@ -931,6 +931,7 @@
     baseForm.append('id', String(payload.variantId));
     baseForm.append('quantity', String(payload.quantity || 1));
     baseForm.append('properties[_design_id]', payload.designId);
+    baseForm.append('properties[Design ID]', payload.designId);
     baseForm.append('properties[_custom_group_id]', payload.designId);
     baseForm.append('properties[_item_type]', 'product');
     baseForm.append('properties[_customized]', 'true');

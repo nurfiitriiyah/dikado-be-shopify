@@ -82,6 +82,55 @@
       button.disabled = count === 0;
       button.setAttribute('data-selected-count', String(count));
     });
+    updateSelectedTotal();
+  }
+
+  function cartPriceLines() {
+    var data = document.querySelector('[data-cart-checkout-prices]');
+    if (!data) return [];
+    try { return JSON.parse(data.textContent || '[]'); } catch (_) { return []; }
+  }
+
+  function selectedTotal() {
+    var selection = readSelection();
+    var lines = cartPriceLines();
+    if (selection === null || !lines.length) return null;
+
+    var selectedMain = lines.filter(function (item) {
+      return item.type !== 'print_fee' && item.hamperRole !== 'packaging' && selection.has(item.key);
+    });
+    var selectedDesigns = new Set(selectedMain.map(function (item) { return item.designId; }).filter(Boolean));
+    var selectedHamperIds = new Set(selectedMain.map(function (item) { return item.hamperId; }).filter(Boolean));
+
+    return lines.reduce(function (total, item) {
+      var include = selection.has(item.key);
+      if (item.type === 'print_fee') include = selectedDesigns.has(item.designId);
+      if (item.hamperRole === 'packaging') include = selectedHamperIds.has(item.hamperId);
+      return include ? total + Number(item.price || 0) : total;
+    }, 0);
+  }
+
+  function formatMoney(cents, format, currency) {
+    return format.replace(/{{\s*(\w+)\s*}}/g, function (_, placeholder) {
+      if (placeholder === 'currency') return currency;
+      var comma = placeholder.indexOf('comma_separator') !== -1 || placeholder.indexOf('space_separator') !== -1;
+      var noDecimals = placeholder.indexOf('no_decimals') !== -1;
+      var space = placeholder.indexOf('space_separator') !== -1;
+      var amount = (cents / 100).toFixed(noDecimals ? 0 : 2).split('.');
+      var separator = space ? ' ' : (comma ? '.' : ',');
+      amount[0] = amount[0].replace(/\B(?=(\d{3})+(?!\d))/g, separator);
+      return noDecimals ? amount[0] : amount[0] + (comma || space ? ',' : '.') + amount[1];
+    });
+  }
+
+  function updateSelectedTotal() {
+    var total = selectedTotal();
+    if (total === null) return;
+    document.querySelectorAll('[data-cart-selected-total]').forEach(function (element) {
+      var formatted = formatMoney(total, element.dataset.moneyFormat || '{{amount}}', element.dataset.currency || '');
+      element.textContent = formatted;
+      element.setAttribute('value', formatted);
+    });
   }
 
   function onChange(event) {
