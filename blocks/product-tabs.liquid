@@ -1,0 +1,278 @@
+{% liquid
+  assign product_resource = closest.product
+  if request.visual_preview_mode and product_resource == blank
+    assign product_resource = collections.all.products.first
+  endif
+  assign has_size = product_resource.metafields.custom.has_size.value
+  assign has_ingredients = product_resource.metafields.custom.has_ingridients.value
+  assign block_settings = block.settings
+%}
+
+{% unless product_resource == blank %}
+  <dikado-product-tabs
+    class="dikado-product-tabs dikado-product-tabs--{{ block_settings.alignment }} dikado-product-tabs--{{ block_settings.tab_width }} spacing-style"
+    style="{% render 'spacing-style', settings: block_settings %}"
+    {{ block.shopify_attributes }}
+  >
+    {% if has_size or has_ingredients %}
+      <div class="dikado-product-tabs__nav" role="tablist" aria-label="Product information">
+        <button type="button" class="dikado-product-tabs__button is-active" role="tab" aria-selected="true" aria-controls="ProductTab-details-{{ block.id }}" id="ProductTabButton-details-{{ block.id }}" data-tab="details">
+          <span>Details</span>
+        </button>
+
+        {% if has_size %}
+          <button type="button" class="dikado-product-tabs__button" role="tab" aria-selected="false" aria-controls="ProductTab-size-{{ block.id }}" id="ProductTabButton-size-{{ block.id }}" tabindex="-1" data-tab="size">
+            <span>Size</span>
+          </button>
+        {% endif %}
+
+        {% if has_ingredients %}
+          <button type="button" class="dikado-product-tabs__button" role="tab" aria-selected="false" aria-controls="ProductTab-ingredients-{{ block.id }}" id="ProductTabButton-ingredients-{{ block.id }}" tabindex="-1" data-tab="ingredients">
+            <span>Ingredients</span>
+          </button>
+        {% endif %}
+      </div>
+    {% endif %}
+ <hr>
+    <div class="dikado-product-tabs__content rte">
+     
+      <div class="dikado-product-tabs__panel is-active" role="tabpanel" id="ProductTab-details-{{ block.id }}" aria-labelledby="ProductTabButton-details-{{ block.id }}" data-tab-content="details">
+        <div class="dikado-product-tabs__panel-content" id="ProductTabContent-details-{{ block.id }}">
+          {{ product_resource.description }}
+        </div>
+        <button
+          type="button"
+          class="dikado-product-tabs__more"
+          aria-controls="ProductTabContent-details-{{ block.id }}"
+          aria-expanded="false"
+          hidden
+        >
+          <span class="dikado-product-tabs__more-label">See more</span>
+        </button>
+      </div>
+
+      {% if has_size %}
+        <div class="dikado-product-tabs__panel" role="tabpanel" id="ProductTab-size-{{ block.id }}" aria-labelledby="ProductTabButton-size-{{ block.id }}" data-tab-content="size" hidden>
+          <div class="dikado-product-tabs__panel-content" id="ProductTabContent-size-{{ block.id }}">
+            {{ product_resource.metafields.custom.size_info.value }}
+          </div>
+          <button
+            type="button"
+            class="dikado-product-tabs__more"
+            aria-controls="ProductTabContent-size-{{ block.id }}"
+            aria-expanded="false"
+            hidden
+          >
+            <span class="dikado-product-tabs__more-label">See more</span>
+          </button>
+        </div>
+      {% endif %}
+
+      {% if has_ingredients %}
+        <div class="dikado-product-tabs__panel" role="tabpanel" id="ProductTab-ingredients-{{ block.id }}" aria-labelledby="ProductTabButton-ingredients-{{ block.id }}" data-tab-content="ingredients" hidden>
+          <div class="dikado-product-tabs__panel-content" id="ProductTabContent-ingredients-{{ block.id }}">
+            {{ product_resource.metafields.custom.ingredients.value }}
+          </div>
+          <button
+            type="button"
+            class="dikado-product-tabs__more"
+            aria-controls="ProductTabContent-ingredients-{{ block.id }}"
+            aria-expanded="false"
+            hidden
+          >
+            <span class="dikado-product-tabs__more-label">See more</span>
+          </button>
+        </div>
+      {% endif %}
+    </div>
+  </dikado-product-tabs>
+  
+{% endunless %}
+
+<script src="{{ 'product-tabs.js' | asset_url }}" defer="defer"></script>
+
+{% stylesheet %}
+  .dikado-product-tabs {
+    display: block;
+    width: 100%;
+  }
+
+  .dikado-product-tabs__nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap-sm);
+    width: 100%;
+  }
+
+  .dikado-product-tabs--center .dikado-product-tabs__nav { justify-content: center; }
+  .dikado-product-tabs--right .dikado-product-tabs__nav { justify-content: flex-end; }
+
+  .dikado-product-tabs--equal .dikado-product-tabs__nav {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+  }
+
+  .dikado-product-tabs__button {
+    appearance: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 3.25em;
+    min-width: fit-content;
+    padding-block: var(--padding-sm);
+    padding-inline: var(--padding-lg);
+    border: var(--options-border-width) solid var(--color-variant-border);
+    border-radius: var(--options-border-radius);
+    background-color: var(--color-variant-background);
+    color: var(--color-variant-text);
+    font: inherit;
+    line-height: inherit;
+    white-space: nowrap;
+    transition-property: background-color, border-color, color;
+    transition-duration: var(--animation-speed);
+  }
+
+  .dikado-product-tabs__button:hover {
+    background-color: var(--color-variant-hover-background);
+    border-color: var(--color-variant-hover-border);
+    color: var(--color-variant-hover-text);
+  }
+
+  .dikado-product-tabs__button.is-active {
+    background-color: var(--color-selected-variant-background);
+    border-color: var(--color-selected-variant-border);
+    color: var(--color-selected-variant-text);
+  }
+
+  .dikado-product-tabs__button.is-active:hover {
+    background-color: var(--color-selected-variant-hover-background);
+    border-color: var(--color-selected-variant-hover-border);
+    color: var(--color-selected-variant-hover-text);
+  }
+
+  .dikado-product-tabs__button:focus-visible {
+    outline: var(--focus-outline-width) solid currentcolor;
+    outline-offset: var(--focus-outline-offset);
+  }
+
+  .dikado-product-tabs__content {
+    padding-block-start: var(--padding-lg);
+    text-align: start;
+  }
+
+  .dikado-product-tabs__panel[hidden] { display: none; }
+  .dikado-product-tabs__panel-content > :first-child { margin-block-start: 0; }
+  .dikado-product-tabs__panel-content > :last-child { margin-block-end: 0; }
+
+  .dikado-product-tabs__panel-content.is-collapsible:not(.is-expanded) {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+  }
+
+  .dikado-product-tabs__more {
+    appearance: none;
+    cursor: pointer;
+    margin-block-start: var(--gap-sm);
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid currentcolor;
+    background: transparent;
+    color: currentcolor;
+    font: inherit;
+    font-weight: 600;
+    line-height: inherit;
+  }
+
+  .dikado-product-tabs__more:hover { opacity: 0.7; }
+
+  .dikado-product-tabs__more:focus-visible {
+    outline: var(--focus-outline-width) solid currentcolor;
+    outline-offset: var(--focus-outline-offset);
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Product tabs",
+  "tag": null,
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Tab content is taken from the product description, size info, and ingredients metafields."
+    },
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "select",
+      "id": "tab_width",
+      "label": "Tab width",
+      "options": [
+        { "value": "fit", "label": "Fit content" },
+        { "value": "equal", "label": "Equal width" }
+      ],
+      "default": "fit"
+    },
+    {
+      "type": "text_alignment",
+      "id": "alignment",
+      "label": "Alignment",
+      "default": "left"
+    },
+    {
+      "type": "header",
+      "content": "Padding"
+    },
+    {
+      "type": "range",
+      "id": "padding-block-start",
+      "label": "Top",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding-block-end",
+      "label": "Bottom",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "padding-inline-start",
+      "label": "Left",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "padding-inline-end",
+      "label": "Right",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    }
+  ],
+  "presets": [
+    {
+      "name": "Product tabs",
+      "category": "Product"
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,14 @@
+api_version = "2026-01"
+
+[[extensions]]
+name = "Dikado design download"
+handle = "dikado-design-download"
+type = "ui_extension"
+uid = "83d97d8c-c4d1-4c0e-a87b-bc2550abcba5"
+
+[[extensions.targeting]]
+module = "./src/DesignDownload.jsx"
+target = "customer-account.order-status.cart-line-item.render-after"
+
+[extensions.capabilities]
+network_access = true

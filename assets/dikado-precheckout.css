@@ -1,0 +1,319 @@
+.dikado-checkout-section {
+  padding-block: clamp(32px, 5vw, 72px);
+}
+
+.dikado-checkout-heading {
+  margin-block-end: 32px;
+}
+
+.dikado-checkout-heading h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+}
+
+.dikado-checkout-heading p,
+.dikado-muted {
+  color: rgb(var(--color-foreground-rgb) / .65);
+}
+
+.dikado-checkout-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(260px, .8fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.dikado-checkout-grid > *,
+.dikado-panel,
+.dikado-address-card > span,
+.dikado-shipping-card > span {
+  min-width: 0;
+}
+
+.dikado-checkout-main {
+  display: grid;
+  gap: 24px;
+}
+
+.dikado-panel {
+  background: rgb(var(--color-background-rgb));
+  border: 1px solid rgb(var(--color-foreground-rgb) / .14);
+  border-radius: var(--style-border-radius-containers, 16px);
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.dikado-panel__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-block-end: 20px;
+}
+
+.dikado-panel__heading > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dikado-panel h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.dikado-step {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgb(var(--color-foreground-rgb));
+  color: rgb(var(--color-background-rgb));
+  font-weight: 700;
+}
+
+.dikado-address-list,
+.dikado-shipping-list {
+  display: grid;
+  gap: 12px;
+}
+
+.dikado-address-card,
+.dikado-shipping-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgb(var(--color-foreground-rgb) / .16);
+  border-radius: 12px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.dikado-address-card.is-selected,
+.dikado-shipping-card.is-selected {
+  border-color: rgb(var(--color-foreground-rgb));
+  box-shadow: 0 0 0 1px rgb(var(--color-foreground-rgb));
+}
+
+.dikado-address-card input,
+.dikado-shipping-card input {
+  margin-block-start: 5px;
+}
+
+.dikado-address-card__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dikado-address-card p,
+.dikado-shipping-card p {
+  margin: 6px 0 0;
+}
+
+.dikado-badge {
+  font-size: .75rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgb(var(--color-foreground-rgb) / .1);
+}
+
+.dikado-address-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-block-start: 10px;
+}
+
+.dikado-link-button {
+  border: 0;
+  background: none;
+  padding: 0;
+  text-decoration: underline;
+  color: inherit;
+  cursor: pointer;
+}
+
+.dikado-shipping-list {
+  margin-block-start: 16px;
+}
+
+.dikado-shipping-card__price {
+  display: block;
+  margin-block-start: 10px;
+  font-weight: 700;
+}
+
+.dikado-shipping-summary {
+  position: sticky;
+  top: 24px;
+}
+
+.dikado-shipping-summary__empty,
+.dikado-shipping-summary__selection {
+  margin: 20px 0;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgb(var(--color-foreground-rgb) / .05);
+  overflow-wrap: anywhere;
+}
+
+.dikado-shipping-summary__selection p {
+  margin: 8px 0 0;
+}
+
+.dikado-shipping-summary__price {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.dikado-continue {
+  width: 100%;
+}
+
+.dikado-cart-link {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 16px auto 0;
+  color: inherit;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.dikado-address-modal {
+  width: min(720px, calc(100% - 24px));
+  max-height: calc(100vh - 24px);
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  color: inherit;
+  background: rgb(var(--color-background-rgb));
+}
+
+.dikado-address-modal::backdrop {
+  background: #0009;
+}
+
+.dikado-address-modal__shell {
+  padding: 24px;
+  overflow: auto;
+}
+
+.dikado-address-modal__heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-block-end: 20px;
+}
+
+.dikado-address-modal__heading h2 {
+  margin: 0;
+}
+
+.dikado-modal-close {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.dikado-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.dikado-form-grid label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.dikado-form-grid input,
+.dikado-form-grid select,
+.dikado-form-grid textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid rgb(var(--color-foreground-rgb) / .25);
+  border-radius: 8px;
+  padding: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.dikado-form-grid__wide {
+  grid-column: 1 / -1;
+}
+
+.dikado-form-grid .dikado-checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.dikado-checkbox input {
+  width: auto;
+  min-height: auto;
+}
+
+.dikado-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-block-start: 24px;
+}
+
+.dikado-form-error,
+.dikado-checkout-error,
+.dikado-status-error {
+  color: #b42318;
+}
+
+.dikado-login-state {
+  text-align: center;
+}
+
+.dikado-status-empty {
+  padding: 20px;
+  border: 1px dashed rgb(var(--color-foreground-rgb) / .2);
+  border-radius: 12px;
+}
+
+@media (max-width: 749px) {
+  .dikado-checkout-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dikado-shipping-summary {
+    position: static;
+  }
+
+  .dikado-panel__heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dikado-panel__heading .button,
+  .dikado-continue {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .dikado-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dikado-address-modal__shell {
+    padding: 18px;
+  }
+
+  .dikado-modal-actions {
+    flex-wrap: wrap;
+  }
+}

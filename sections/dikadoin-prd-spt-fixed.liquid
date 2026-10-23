@@ -1,0 +1,199 @@
+{% assign product = section.settings.product %}
+
+<section
+  id="DikadoinSpotlight-{{ section.id }}"
+  class="dikadoin-spotlight"
+  style="
+    --spot-bg: {{ section.settings.background_color }};
+    --spot-text: {{ section.settings.text_color }};
+    --spot-accent: {{ section.settings.accent_color }};
+    --spot-radius: {{ section.settings.border_radius }}px;
+  "
+>
+  <div class="page-width">
+    <div class="dikadoin-spotlight__card">
+      <div class="dikadoin-spotlight__media">
+        {% if product != blank and product.featured_image != blank %}
+          {{
+            product.featured_image
+            | image_url: width: 1400
+            | image_tag:
+              loading: 'lazy',
+              widths: '480, 720, 960, 1200, 1400',
+              sizes: '(min-width: 750px) 50vw, 100vw',
+              class: 'dikadoin-spotlight__image'
+          }}
+        {% else %}
+          {{ 'product-1' | placeholder_svg_tag: 'dikadoin-spotlight__placeholder placeholder-svg' }}
+        {% endif %}
+      </div>
+
+      <div class="dikadoin-spotlight__content">
+        {% if section.settings.eyebrow != blank %}
+          <p class="dikadoin-spotlight__eyebrow">{{ section.settings.eyebrow | escape }}</p>
+        {% endif %}
+
+        {% if section.settings.custom_heading != blank %}
+          <h2 class="dikadoin-spotlight__heading">{{ section.settings.custom_heading }}</h2>
+        {% elsif product != blank %}
+          <h2 class="dikadoin-spotlight__heading">{{ product.title | escape }}</h2>
+        {% else %}
+          <h2 class="dikadoin-spotlight__heading">Something special for them.</h2>
+        {% endif %}
+
+        {% if product != blank %}
+          <p class="dikadoin-spotlight__price">
+            {% if product.price_varies %}From {% endif %}{{ product.price | money }}
+          </p>
+        {% endif %}
+
+        {% if section.settings.text != blank %}
+          <div class="dikadoin-spotlight__text rte">{{ section.settings.text }}</div>
+        {% elsif product != blank and product.description != blank %}
+          <div class="dikadoin-spotlight__text rte">{{ product.description | strip_html | truncatewords: 32 }}</div>
+        {% endif %}
+
+        {% if product != blank %}
+          <a class="dikadoin-spotlight__button" href="{{ product.url }}">
+            {{ section.settings.button_label | default: 'View product' | escape }}
+          </a>
+        {% elsif section.settings.button_link != blank %}
+          <a class="dikadoin-spotlight__button" href="{{ section.settings.button_link }}">
+            {{ section.settings.button_label | default: 'Explore' | escape }}
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% style %}
+  #DikadoinSpotlight-{{ section.id }} {
+    padding: {{ section.settings.padding_top }}px 0 {{ section.settings.padding_bottom }}px;
+  }
+
+  #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__card {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+    min-height: 470px;
+    border-radius: var(--spot-radius);
+    background: var(--spot-bg);
+    color: var(--spot-text);
+    overflow: hidden;
+  }
+
+  #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__media {
+    min-width: 0;
+    background: rgba(255,255,255,.35);
+  }
+
+  #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__image,
+  #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__placeholder {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 470px;
+    object-fit: {{ section.settings.image_fit }};
+  }
+
+  #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(34px, 6vw, 72px);
+  }
+
+  #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__eyebrow {
+    margin: 0 0 10px;
+    font-size: .82rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    opacity: .68;
+  }
+
+  #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__heading {
+    margin: 0;
+    color: inherit;
+    font-size: clamp(2rem, 4vw, 4rem);
+    line-height: 1.02;
+  }
+
+  #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__price {
+    margin: 14px 0 0;
+    font-size: 1.08rem;
+    font-weight: 700;
+  }
+
+  #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__text {
+    margin-top: 16px;
+    max-width: 520px;
+    line-height: 1.65;
+  }
+
+  #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__button {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 24px;
+    min-height: 46px;
+    padding: 11px 20px;
+    border-radius: 999px;
+    background: var(--spot-accent);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+  }
+
+  @media screen and (max-width: 749px) {
+    #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__card {
+      grid-template-columns: 1fr;
+      min-height: 0;
+    }
+
+    #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__image,
+    #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__placeholder {
+      min-height: 300px;
+    }
+
+    #DikadoinSpotlight-{{ section.id }} .dikadoin-spotlight__content {
+      padding: 30px;
+    }
+  }
+{% endstyle %}
+
+{% schema %}
+{
+  "name": "DikadoIn — Prod Spot",
+  "tag": "section",
+  "class": "section",
+  "settings": [
+    { "type": "product", "id": "product", "label": "Product" },
+    { "type": "text", "id": "eyebrow", "label": "Eyebrow", "default": "A little favorite" },
+    { "type": "inline_richtext", "id": "custom_heading", "label": "Custom heading", "info": "Leave blank to use product title." },
+    { "type": "richtext", "id": "text", "label": "Custom text", "info": "Leave blank to use a shortened product description." },
+    { "type": "text", "id": "button_label", "label": "Button label", "default": "View product" },
+    { "type": "url", "id": "button_link", "label": "Fallback button link", "info": "Used only when no product is selected." },
+    {
+      "type": "select",
+      "id": "image_fit",
+      "label": "Image fit",
+      "default": "contain",
+      "options": [
+        { "value": "contain", "label": "Contain" },
+        { "value": "cover", "label": "Cover" }
+      ]
+    },
+    { "type": "color", "id": "background_color", "label": "Background", "default": "#F8F1E8" },
+    { "type": "color", "id": "text_color", "label": "Text", "default": "#4B342D" },
+    { "type": "color", "id": "accent_color", "label": "Button", "default": "#D96C6C" },
+    { "type": "range", "id": "border_radius", "min": 0, "max": 40, "step": 2, "unit": "px", "label": "Corner radius", "default": 24 },
+    { "type": "range", "id": "padding_top", "min": 0, "max": 120, "step": 4, "unit": "px", "label": "Top spacing", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "min": 0, "max": 120, "step": 4, "unit": "px", "label": "Bottom spacing", "default": 48 }
+  ],
+  "presets": [
+    { "name": "DikadoIn — Prod Spot" }
+  ]
+}
+{% endschema %}

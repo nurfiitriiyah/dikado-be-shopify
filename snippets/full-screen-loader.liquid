@@ -1,0 +1,17 @@
+<full-screen-loader
+  id="{{ id }}"
+  class="full-screen-loader color-{{ color_scheme | default: 'scheme-1' }}"
+  data-loading-text="{{ loading_text | default: 'Memuat halaman…' | escape }}"
+  data-loading-description="{{ loading_description | default: 'Sebentar ya, kita siapin semuanya dulu ✨' | escape }}"
+  role="status"
+  aria-live="polite"
+  aria-busy="{% if start_hidden %}false{% else %}true{% endif %}"
+  {% if start_hidden %}hidden{% endif %}
+>
+  <div class="full-screen-loader__panel">
+    <span class="full-screen-loader__spinner" data-full-screen-spinner aria-hidden="true"></span>
+    <h2 class="full-screen-loader__heading" data-full-screen-heading>{{ loading_text | default: 'Memuat halaman…' | escape }}</h2>
+    <p class="full-screen-loader__message" data-full-screen-message>{{ loading_description | default: 'Bentar ya, kita siapin semuanya dulu ✨' | escape }}</p>
+    <button class="full-screen-loader__retry" type="button" data-full-screen-retry hidden>Coba lagi</button>
+  </div>
+</full-screen-loader>

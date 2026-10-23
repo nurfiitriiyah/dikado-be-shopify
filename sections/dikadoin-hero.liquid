@@ -1,0 +1,206 @@
+{% liquid
+  assign heading = section.settings.heading
+  assign text = section.settings.text
+  assign button_label = section.settings.button_label
+  assign button_link = section.settings.button_link
+%}
+
+<section
+  id="DikadoinHero-{{ section.id }}"
+  class="dikadoin-hero dikadoin-hero--{{ section.settings.height }}"
+  style="
+    --section-bg: {{ section.settings.background_color }};
+    --section-text: {{ section.settings.text_color }};
+    --section-accent: {{ section.settings.accent_color }};
+    --section-radius: {{ section.settings.border_radius }}px;
+  "
+>
+  <div class="dikadoin-hero__inner page-width">
+    <div class="dikadoin-hero__content">
+      {% if section.settings.eyebrow != blank %}
+        <p class="dikadoin-hero__eyebrow">{{ section.settings.eyebrow | escape }}</p>
+      {% endif %}
+
+      {% if heading != blank %}
+        <h1 class="dikadoin-hero__heading">{{ heading }}</h1>
+      {% endif %}
+
+      {% if text != blank %}
+        <div class="dikadoin-hero__text rte">{{ text }}</div>
+      {% endif %}
+
+      {% if button_label != blank %}
+        <a
+          class="dikadoin-hero__button"
+          {% if button_link != blank %}href="{{ button_link }}"{% else %}role="link" aria-disabled="true"{% endif %}
+        >
+          {{ button_label | escape }}
+        </a>
+      {% endif %}
+    </div>
+
+    <div class="dikadoin-hero__media">
+      {% if section.settings.image != blank %}
+        {{
+          section.settings.image
+          | image_url: width: 1800
+          | image_tag:
+            loading: 'eager',
+            widths: '480, 720, 960, 1200, 1600, 1800',
+            sizes: '(min-width: 990px) 50vw, 100vw',
+            class: 'dikadoin-hero__image'
+        }}
+      {% else %}
+        {{ 'lifestyle-1' | placeholder_svg_tag: 'dikadoin-hero__placeholder placeholder-svg' }}
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{% style %}
+  #DikadoinHero-{{ section.id }} {
+    background: var(--section-bg);
+    color: var(--section-text);
+    overflow: hidden;
+  }
+
+  #DikadoinHero-{{ section.id }} .dikadoin-hero__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(28px, 5vw, 72px);
+    min-height: 560px;
+    padding-top: clamp(48px, 7vw, 96px);
+    padding-bottom: clamp(48px, 7vw, 96px);
+  }
+
+  #DikadoinHero-{{ section.id }}.dikadoin-hero--compact .dikadoin-hero__inner {
+    min-height: 440px;
+  }
+
+  #DikadoinHero-{{ section.id }}.dikadoin-hero--large .dikadoin-hero__inner {
+    min-height: 680px;
+  }
+
+  #DikadoinHero-{{ section.id }} .dikadoin-hero__content {
+    max-width: 640px;
+  }
+
+  #DikadoinHero-{{ section.id }} .dikadoin-hero__eyebrow {
+    margin: 0 0 12px;
+    font-size: 0.86rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.72;
+  }
+
+  #DikadoinHero-{{ section.id }} .dikadoin-hero__heading {
+    margin: 0;
+    color: inherit;
+    font-size: clamp(2.5rem, 6vw, 5.8rem);
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+  }
+
+  #DikadoinHero-{{ section.id }} .dikadoin-hero__text {
+    margin-top: 22px;
+    max-width: 560px;
+    font-size: clamp(1rem, 1.6vw, 1.2rem);
+    line-height: 1.6;
+  }
+
+  #DikadoinHero-{{ section.id }} .dikadoin-hero__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 28px;
+    min-height: 48px;
+    padding: 12px 22px;
+    border-radius: 999px;
+    background: var(--section-accent);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+  }
+
+  #DikadoinHero-{{ section.id }} .dikadoin-hero__media {
+    min-width: 0;
+  }
+
+  #DikadoinHero-{{ section.id }} .dikadoin-hero__image,
+  #DikadoinHero-{{ section.id }} .dikadoin-hero__placeholder {
+    display: block;
+    width: 100%;
+    max-height: 620px;
+    object-fit: contain;
+    border-radius: var(--section-radius);
+  }
+
+  @media screen and (max-width: 749px) {
+    #DikadoinHero-{{ section.id }} .dikadoin-hero__inner {
+      grid-template-columns: 1fr;
+      min-height: 0;
+      gap: 32px;
+      padding-top: 42px;
+      padding-bottom: 42px;
+    }
+
+    #DikadoinHero-{{ section.id }} .dikadoin-hero__content {
+      text-align: {{ section.settings.mobile_alignment }};
+    }
+
+    #DikadoinHero-{{ section.id }} .dikadoin-hero__heading {
+      font-size: clamp(2.35rem, 13vw, 4rem);
+    }
+
+    #DikadoinHero-{{ section.id }} .dikadoin-hero__media {
+      order: {% if section.settings.mobile_image_first %}-1{% else %}2{% endif %};
+    }
+  }
+{% endstyle %}
+
+{% schema %}
+{
+  "name": "DikadoIn — Hero",
+  "tag": "section",
+  "class": "section",
+  "settings": [
+    { "type": "text", "id": "eyebrow", "label": "Eyebrow", "default": "Made for your story" },
+    { "type": "inline_richtext", "id": "heading", "label": "Heading", "default": "A little something, made to mean more." },
+    { "type": "richtext", "id": "text", "label": "Text", "default": "<p>Personal gifts, custom merchandise, and hampers made with a little more feeling.</p>" },
+    { "type": "text", "id": "button_label", "label": "Button label", "default": "Explore gifts" },
+    { "type": "url", "id": "button_link", "label": "Button link" },
+    { "type": "image_picker", "id": "image", "label": "Image" },
+    {
+      "type": "select",
+      "id": "height",
+      "label": "Height",
+      "default": "default",
+      "options": [
+        { "value": "compact", "label": "Compact" },
+        { "value": "default", "label": "Default" },
+        { "value": "large", "label": "Large" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "mobile_alignment",
+      "label": "Mobile text alignment",
+      "default": "left",
+      "options": [
+        { "value": "left", "label": "Left" },
+        { "value": "center", "label": "Center" }
+      ]
+    },
+    { "type": "checkbox", "id": "mobile_image_first", "label": "Show image first on mobile", "default": false },
+    { "type": "color", "id": "background_color", "label": "Background", "default": "#F8F1E8" },
+    { "type": "color", "id": "text_color", "label": "Text", "default": "#4B342D" },
+    { "type": "color", "id": "accent_color", "label": "Button", "default": "#D96C6C" },
+    { "type": "range", "id": "border_radius", "min": 0, "max": 40, "step": 2, "unit": "px", "label": "Image corner radius", "default": 24 }
+  ],
+  "presets": [
+    { "name": "DikadoIn — Hero" }
+  ]
+}
+{% endschema %}

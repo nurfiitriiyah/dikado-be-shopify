@@ -1,0 +1,162 @@
+{{ 'rajaongkir-address-testing.css' | asset_url | stylesheet_tag }}
+{{ 'full-screen-loader.css' | asset_url | stylesheet_tag }}
+
+{% liquid
+  assign tester_allowed = false
+  if request.design_mode
+    assign tester_allowed = true
+  elsif section.settings.restrict_access == false
+    assign tester_allowed = true
+  elsif customer and customer.tags contains section.settings.access_tag
+    assign tester_allowed = true
+  endif
+  assign rajaongkir_loader_id = 'RajaOngkirTestingLoader-' | append: section.id
+%}
+
+{% if tester_allowed %}
+  <script src="{{ 'full-screen-loader.js' | asset_url }}" defer="defer"></script>
+  <script type="module" src="{{ 'rajaongkir-address-testing.js' | asset_url }}"></script>
+  {% render 'full-screen-loader',
+    id: rajaongkir_loader_id,
+    color_scheme: section.settings.color_scheme,
+    loading_text: 'Memuat data wilayah…',
+    loading_description: 'Kami sedang menyiapkan pilihan provinsi.'
+  %}
+  <div id="RajaOngkirTestingContent-{{ section.id }}" hidden>
+    <rajaongkir-address-testing
+      class="rajaongkir-test color-{{ section.settings.color_scheme }}"
+      data-api-base="{{ section.settings.app_proxy_path | escape }}"
+      data-loader-id="{{ rajaongkir_loader_id }}"
+      data-content-id="RajaOngkirTestingContent-{{ section.id }}"
+    >
+    <header class="rajaongkir-test__header">
+      <p class="rajaongkir-test__eyebrow">Internal testing</p>
+      <h1>{{ section.settings.heading | escape }}</h1>
+      <p class="rajaongkir-test__intro">{{ section.settings.description | escape }}</p>
+    </header>
+
+    <section class="rajaongkir-test__panel" aria-labelledby="location-heading-{{ section.id }}">
+      <h2 id="location-heading-{{ section.id }}">Alamat tujuan</h2>
+      <div class="rajaongkir-test__grid">
+        {% assign location_levels = 'province:Provinsi,city:Kota/Kabupaten,district:Kecamatan,subdistrict:Kelurahan' | split: ',' %}
+        {% for location_level in location_levels %}
+          {% assign parts = location_level | split: ':' %}
+          <div class="rajaongkir-test__field">
+            <label for="rajaongkir-{{ parts[0] }}-{{ section.id }}">{{ parts[1] }}</label>
+            <select
+              id="rajaongkir-{{ parts[0] }}-{{ section.id }}"
+              data-location="{{ parts[0] }}"
+              disabled
+              aria-describedby="rajaongkir-{{ parts[0] }}-status-{{ section.id }}"
+            >
+              <option value="">Pilih {{ parts[1] | downcase }}</option>
+            </select>
+            <p
+              id="rajaongkir-{{ parts[0] }}-status-{{ section.id }}"
+              class="rajaongkir-test__field-status"
+              data-location-status="{{ parts[0] }}"
+              aria-live="polite"
+            ></p>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="rajaongkir-test__panel" aria-labelledby="calculate-heading-{{ section.id }}">
+      <h2 id="calculate-heading-{{ section.id }}">Kalkulasi ongkir</h2>
+      <form data-calculate-form novalidate>
+        <div class="rajaongkir-test__grid">
+          <div class="rajaongkir-test__field">
+            <label for="rajaongkir-destination-{{ section.id }}">Destination district ID</label>
+            <input id="rajaongkir-destination-{{ section.id }}" data-destination-district type="number" readonly required>
+          </div>
+          <div class="rajaongkir-test__field">
+            <label for="rajaongkir-weight-{{ section.id }}">Berat (gram)</label>
+            <input id="rajaongkir-weight-{{ section.id }}" name="weight" type="number" min="1" step="1" value="1000" inputmode="numeric" required>
+          </div>
+          <div class="rajaongkir-test__field">
+            <label for="rajaongkir-courier-{{ section.id }}">Kurir</label>
+            <input id="rajaongkir-courier-{{ section.id }}" name="courier" type="text" value="jne:sicepat" autocomplete="off" required>
+          </div>
+          <div class="rajaongkir-test__field">
+            <label for="rajaongkir-price-{{ section.id }}">Urutan harga</label>
+            <select id="rajaongkir-price-{{ section.id }}" name="price">
+              <option value="lowest" selected>Termurah</option>
+              <option value="highest">Termahal</option>
+            </select>
+          </div>
+          <p class="rajaongkir-test__hint">Origin ditetapkan server-side ke Jagakarsa (district ID 1330). Kalkulasi memakai destination ID kecamatan; pilihan kelurahan hanya digunakan untuk menguji kelengkapan hierarki alamat.</p>
+        </div>
+        <div class="rajaongkir-test__actions">
+          <button class="rajaongkir-test__button" type="submit" data-calculate-button disabled aria-busy="false">Hitung ongkir</button>
+          <p class="rajaongkir-test__status" data-calculate-status role="status" aria-live="polite"></p>
+        </div>
+      </form>
+      <div class="rajaongkir-test__results" data-rate-results></div>
+      <details>
+        <summary>Raw JSON response</summary>
+        <pre class="rajaongkir-test__raw" data-raw-output>Belum ada respons.</pre>
+      </details>
+    </section>
+    </rajaongkir-address-testing>
+  </div>
+{% else %}
+  <div class="rajaongkir-test__notice color-{{ section.settings.color_scheme }}">
+    {% if customer %}
+      <p>Halaman ini hanya tersedia untuk internal tester.</p>
+    {% else %}
+      <p>Silakan <a href="{{ routes.account_login_url }}">masuk</a> menggunakan akun tester.</p>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "RajaOngkir testing",
+  "class": "section-wrapper",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "RajaOngkir address test"
+    },
+    {
+      "type": "textarea",
+      "id": "description",
+      "label": "Description",
+      "default": "Uji hierarki alamat Indonesia dan kalkulasi ongkir sebelum integrasi ke customer account dan checkout."
+    },
+    {
+      "type": "text",
+      "id": "app_proxy_path",
+      "label": "App Proxy path",
+      "default": "/apps/dikado-address"
+    },
+    {
+      "type": "checkbox",
+      "id": "restrict_access",
+      "label": "Restrict to tester customer tag",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "access_tag",
+      "label": "Tester customer tag",
+      "default": "address-tester",
+      "visible_if": "{{ section.settings.restrict_access }}"
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "Color scheme",
+      "default": "scheme-1"
+    }
+  ],
+  "presets": [
+    {
+      "name": "RajaOngkir testing"
+    }
+  ]
+}
+{% endschema %}

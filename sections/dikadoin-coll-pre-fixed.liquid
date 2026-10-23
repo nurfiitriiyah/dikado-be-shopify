@@ -1,0 +1,240 @@
+{% assign collection = section.settings.collection %}
+
+<section
+  id="DikadoinCollection-{{ section.id }}"
+  class="dikadoin-collection"
+  style="
+    --collection-text: {{ section.settings.text_color }};
+    --collection-card-bg: {{ section.settings.card_background }};
+    --collection-accent: {{ section.settings.accent_color }};
+    --collection-radius: {{ section.settings.border_radius }}px;
+  "
+>
+  <div class="page-width">
+    <div class="dikadoin-collection__header">
+      <div>
+        {% if section.settings.eyebrow != blank %}
+          <p class="dikadoin-collection__eyebrow">{{ section.settings.eyebrow | escape }}</p>
+        {% endif %}
+
+        {% if section.settings.heading != blank %}
+          <h2 class="dikadoin-collection__heading">{{ section.settings.heading }}</h2>
+        {% elsif collection != blank %}
+          <h2 class="dikadoin-collection__heading">{{ collection.title | escape }}</h2>
+        {% endif %}
+
+        {% if section.settings.text != blank %}
+          <div class="dikadoin-collection__text rte">{{ section.settings.text }}</div>
+        {% endif %}
+      </div>
+
+      {% if collection != blank and section.settings.show_view_all %}
+        <a class="dikadoin-collection__view-all" href="{{ collection.url }}">
+          {{ section.settings.view_all_label | escape }} →
+        </a>
+      {% endif %}
+    </div>
+
+    <div class="dikadoin-collection__scroller">
+      <div class="dikadoin-collection__grid">
+        {% if collection != blank %}
+          {% for product in collection.products limit: section.settings.products_to_show %}
+            <a class="dikadoin-collection__card" href="{{ product.url }}">
+              <div class="dikadoin-collection__media">
+                {% if product.featured_image != blank %}
+                  {{
+                    product.featured_image
+                    | image_url: width: 900
+                    | image_tag:
+                      loading: 'lazy',
+                      widths: '240, 360, 480, 720, 900',
+                      sizes: '(min-width: 990px) 25vw, 75vw',
+                      class: 'dikadoin-collection__image'
+                  }}
+                {% else %}
+                  {{ 'product-1' | placeholder_svg_tag: 'dikadoin-collection__placeholder placeholder-svg' }}
+                {% endif %}
+              </div>
+
+              <div class="dikadoin-collection__info">
+                <h3 class="dikadoin-collection__product-title">{{ product.title | escape }}</h3>
+                <p class="dikadoin-collection__price">
+                  {% if product.price_varies %}From {% endif %}{{ product.price | money }}
+                </p>
+              </div>
+            </a>
+          {% endfor %}
+        {% else %}
+          {% for i in (1..4) %}
+            <article class="dikadoin-collection__card">
+              <div class="dikadoin-collection__media">
+                {{ 'product-' | append: i | placeholder_svg_tag: 'dikadoin-collection__placeholder placeholder-svg' }}
+              </div>
+              <div class="dikadoin-collection__info">
+                <h3 class="dikadoin-collection__product-title">Example product</h3>
+                <p class="dikadoin-collection__price">Rp0</p>
+              </div>
+            </article>
+          {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+{% style %}
+  #DikadoinCollection-{{ section.id }} {
+    padding: {{ section.settings.padding_top }}px 0 {{ section.settings.padding_bottom }}px;
+    color: var(--collection-text);
+  }
+
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__header {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__eyebrow {
+    margin: 0 0 7px;
+    font-size: .82rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    opacity: .68;
+  }
+
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__heading {
+    margin: 0;
+    color: inherit;
+    font-size: clamp(2rem, 4vw, 3.8rem);
+    line-height: 1.05;
+  }
+
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__text {
+    margin-top: 10px;
+    max-width: 620px;
+    line-height: 1.6;
+  }
+
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__view-all {
+    flex: 0 0 auto;
+    color: var(--collection-accent);
+    text-decoration: none;
+    font-weight: 700;
+  }
+
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__grid {
+    display: grid;
+    grid-template-columns: repeat({{ section.settings.columns_desktop }}, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__card {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__media {
+    aspect-ratio: 1 / 1;
+    border-radius: var(--collection-radius);
+    overflow: hidden;
+    background: var(--collection-card-bg);
+  }
+
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__image,
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__placeholder {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: {{ section.settings.image_fit }};
+    transition: transform 300ms ease;
+  }
+
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__card:hover .dikadoin-collection__image {
+    transform: scale(1.02);
+  }
+
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__info {
+    padding-top: 12px;
+  }
+
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__product-title {
+    margin: 0;
+    color: inherit;
+    font-size: 1rem;
+    line-height: 1.3;
+  }
+
+  #DikadoinCollection-{{ section.id }} .dikadoin-collection__price {
+    margin: 5px 0 0;
+    font-size: .92rem;
+    opacity: .72;
+  }
+
+  @media screen and (max-width: 749px) {
+    #DikadoinCollection-{{ section.id }} .dikadoin-collection__header {
+      align-items: flex-start;
+    }
+
+    #DikadoinCollection-{{ section.id }} .dikadoin-collection__scroller {
+      margin-right: calc(-1 * var(--page-width-margin, 1.5rem));
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    #DikadoinCollection-{{ section.id }} .dikadoin-collection__scroller::-webkit-scrollbar {
+      display: none;
+    }
+
+    #DikadoinCollection-{{ section.id }} .dikadoin-collection__grid {
+      grid-template-columns: none;
+      grid-auto-flow: column;
+      grid-auto-columns: min(68vw, 280px);
+      width: max-content;
+      padding-right: 24px;
+    }
+
+    #DikadoinCollection-{{ section.id }} .dikadoin-collection__view-all {
+      display: none;
+    }
+  }
+{% endstyle %}
+
+{% schema %}
+{
+  "name": "DikadoIn — Coll Preview",
+  "tag": "section",
+  "class": "section",
+  "settings": [
+    { "type": "collection", "id": "collection", "label": "Collection" },
+    { "type": "text", "id": "eyebrow", "label": "Eyebrow", "default": "A few favorites" },
+    { "type": "inline_richtext", "id": "heading", "label": "Custom heading", "info": "Leave blank to use collection title." },
+    { "type": "richtext", "id": "text", "label": "Text", "default": "<p>A smaller collection preview so the page stays light and easy to browse.</p>" },
+    { "type": "range", "id": "products_to_show", "min": 2, "max": 8, "step": 1, "label": "Products to show", "default": 4 },
+    { "type": "range", "id": "columns_desktop", "min": 2, "max": 5, "step": 1, "label": "Desktop columns", "default": 4 },
+    {
+      "type": "select",
+      "id": "image_fit",
+      "label": "Product image fit",
+      "default": "contain",
+      "options": [
+        { "value": "contain", "label": "Contain" },
+        { "value": "cover", "label": "Cover" }
+      ]
+    },
+    { "type": "checkbox", "id": "show_view_all", "label": "Show view all", "default": true },
+    { "type": "text", "id": "view_all_label", "label": "View all label", "default": "View all" },
+    { "type": "color", "id": "card_background", "label": "Product image background", "default": "#F8F1E8" },
+    { "type": "color", "id": "text_color", "label": "Text", "default": "#4B342D" },
+    { "type": "color", "id": "accent_color", "label": "Accent", "default": "#B94E5A" },
+    { "type": "range", "id": "border_radius", "min": 0, "max": 40, "step": 2, "unit": "px", "label": "Image corner radius", "default": 18 },
+    { "type": "range", "id": "padding_top", "min": 0, "max": 120, "step": 4, "unit": "px", "label": "Top spacing", "default": 48 },
+    { "type": "range", "id": "padding_bottom", "min": 0, "max": 120, "step": 4, "unit": "px", "label": "Bottom spacing", "default": 48 }
+  ],
+  "presets": [
+    { "name": "DikadoIn — Coll Preview" }
+  ]
+}
+{% endschema %}

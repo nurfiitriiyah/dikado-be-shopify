@@ -1,0 +1,203 @@
+{{ 'print-zone-tester.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'print-zone-tester.js' | asset_url }}" defer="defer"></script>
+
+<print-zone-tester class="pzt color-{{ section.settings.color_scheme }}" data-storage-key="dikado:print-zone-tester:v1">
+  <header class="pzt__header">
+    <div>
+      <p class="pzt__eyebrow">Internal testing utility</p>
+      <h1>{{ section.settings.heading | escape }}</h1>
+      <p>{{ section.settings.description | escape }}</p>
+    </div>
+    <span class="pzt__logical-badge">Logical width: 1000px</span>
+  </header>
+
+  <noscript>
+    <p class="pzt__notice">JavaScript is required to use the Print Zone Calibrator.</p>
+  </noscript>
+
+  <div class="pzt__layout">
+    <aside class="pzt__panel pzt__controls" aria-labelledby="pzt-controls-{{ section.id }}">
+      <div class="pzt__panel-heading">
+        <span>01</span>
+        <div>
+          <h2 id="pzt-controls-{{ section.id }}">Controls</h2>
+          <p>Mockup and zone settings</p>
+        </div>
+      </div>
+
+      <div class="pzt__upload-grid">
+        <label class="pzt__upload" for="pzt-mockup-{{ section.id }}">
+          <span>Product mockup <em>Required</em></span>
+          <strong>Choose PNG, JPEG, or WebP</strong>
+          <small data-mockup-name>No file selected</small>
+          <input id="pzt-mockup-{{ section.id }}" type="file" accept="image/png,image/jpeg,image/webp" data-mockup-input>
+        </label>
+
+        <label class="pzt__upload" for="pzt-artwork-{{ section.id }}">
+          <span>Sample artwork <em>Optional</em></span>
+          <strong>Choose preview artwork</strong>
+          <small data-artwork-name>No file selected</small>
+          <input id="pzt-artwork-{{ section.id }}" type="file" accept="image/png,image/jpeg,image/webp" data-artwork-input>
+        </label>
+      </div>
+
+      <div class="pzt__section-title">
+        <h3>Active zone</h3>
+        <span data-zone-count>1 zone</span>
+      </div>
+
+      <div class="pzt__fields" data-zone-fields>
+        <label class="pzt__field pzt__field--wide">
+          <span>ID</span>
+          <input type="text" maxlength="64" value="top" data-zone-field="id" autocomplete="off">
+        </label>
+        <label class="pzt__field pzt__field--wide">
+          <span>Label</span>
+          <input type="text" maxlength="100" value="Top" data-zone-field="label" autocomplete="off">
+        </label>
+        <label class="pzt__field">
+          <span>X</span>
+          <input type="number" min="0" max="1" step="0.0001" value="0.35" inputmode="decimal" data-zone-field="x">
+        </label>
+        <label class="pzt__field">
+          <span>Y</span>
+          <input type="number" min="0" max="1" step="0.0001" value="0.2" inputmode="decimal" data-zone-field="y">
+        </label>
+        <label class="pzt__field">
+          <span>Width</span>
+          <input type="number" min="0.001" max="1" step="0.0001" value="0.3" inputmode="decimal" data-zone-field="width">
+        </label>
+        <label class="pzt__field">
+          <span>Height</span>
+          <input type="number" min="0.001" max="1" step="0.0001" value="0.16" inputmode="decimal" data-zone-field="height">
+        </label>
+        <label class="pzt__field">
+          <span>Print width (mm)</span>
+          <input type="number" min="0" step="0.01" value="220" inputmode="decimal" data-zone-field="printWidthMm">
+        </label>
+        <label class="pzt__field">
+          <span>Print height (mm)</span>
+          <input type="number" min="0" step="0.01" value="120" inputmode="decimal" data-zone-field="printHeightMm">
+        </label>
+        <label class="pzt__field">
+          <span>Price</span>
+          <input type="number" min="0" step="1" value="20000" inputmode="numeric" data-zone-field="price">
+        </label>
+        <label class="pzt__field">
+          <span>Fee variant ID</span>
+          <input type="text" inputmode="numeric" data-zone-field="feeVariantId" autocomplete="off">
+        </label>
+      </div>
+      <p class="pzt__validation" data-validation role="alert" hidden></p>
+
+      <div class="pzt__zone-actions">
+        <button type="button" class="button" data-add-zone>Add zone</button>
+        <button type="button" class="button button--secondary" data-duplicate-zone>Duplicate active</button>
+        <button type="button" class="button button--secondary" data-delete-zone>Delete active</button>
+        <button type="button" class="pzt__reset" data-reset>Reset</button>
+      </div>
+
+      <div class="pzt__zone-list-wrap">
+        <h3>Zones</h3>
+        <div class="pzt__zone-list" data-zone-list aria-label="Configured print zones"></div>
+      </div>
+    </aside>
+
+    <main class="pzt__stage-panel" aria-labelledby="pzt-canvas-{{ section.id }}">
+      <div class="pzt__stage-heading">
+        <div>
+          <p>02 / Canvas</p>
+          <h2 id="pzt-canvas-{{ section.id }}">Visual calibration</h2>
+        </div>
+        <span data-canvas-size>Waiting for mockup</span>
+      </div>
+
+      <div class="pzt__stage" data-stage tabindex="0" aria-label="Print zone canvas. Use arrow keys to move the active zone.">
+        <div class="pzt__canvas-shell" data-canvas-shell hidden>
+          <canvas data-canvas></canvas>
+        </div>
+        <div class="pzt__stage-state" data-stage-state data-state="empty" role="status" aria-live="polite">
+          <span class="pzt__stage-icon" aria-hidden="true">↥</span>
+          <strong data-stage-state-title>Upload a product mockup</strong>
+          <p data-stage-state-message>The canvas keeps the image’s original aspect ratio and never uploads it.</p>
+        </div>
+      </div>
+      <p class="pzt__keyboard-hint">Arrow keys move the active zone by 1 logical pixel. Hold Shift to move by 10.</p>
+    </main>
+
+    <aside class="pzt__panel pzt__output" aria-labelledby="pzt-output-{{ section.id }}">
+      <div class="pzt__panel-heading">
+        <span>03</span>
+        <div>
+          <h2 id="pzt-output-{{ section.id }}">Output</h2>
+          <p>Live customizer values</p>
+        </div>
+      </div>
+
+      <div class="pzt__value-group">
+        <h3>Normalized</h3>
+        <dl class="pzt__values">
+          <div><dt>x</dt><dd data-value="x">0.35</dd></div>
+          <div><dt>y</dt><dd data-value="y">0.2</dd></div>
+          <div><dt>width</dt><dd data-value="width">0.3</dd></div>
+          <div><dt>height</dt><dd data-value="height">0.16</dd></div>
+        </dl>
+      </div>
+
+      <div class="pzt__value-group">
+        <h3>Logical canvas pixels</h3>
+        <dl class="pzt__values">
+          <div><dt>left</dt><dd data-pixel-value="left">—</dd></div>
+          <div><dt>top</dt><dd data-pixel-value="top">—</dd></div>
+          <div><dt>width</dt><dd data-pixel-value="width">—</dd></div>
+          <div><dt>height</dt><dd data-pixel-value="height">—</dd></div>
+        </dl>
+      </div>
+
+      <div class="pzt__json-heading">
+        <h3>Active zone JSON</h3>
+        <span>Customizer-ready</span>
+      </div>
+      <pre class="pzt__json" data-active-json aria-live="polite"></pre>
+
+      <div class="pzt__output-actions">
+        <button type="button" class="button" data-copy-active>Copy active zone JSON</button>
+        <button type="button" class="button button--secondary" data-copy-complete>Copy complete config</button>
+        <button type="button" class="button button--secondary" data-download>Download JSON</button>
+      </div>
+      <p class="pzt__status" data-status role="status" aria-live="polite"></p>
+    </aside>
+  </div>
+</print-zone-tester>
+
+{% schema %}
+{
+  "name": "Print zone tester",
+  "class": "section-wrapper",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Print Zone Calibrator"
+    },
+    {
+      "type": "textarea",
+      "id": "description",
+      "label": "Description",
+      "default": "Upload a product mockup, calibrate its printable areas, and export customizer-ready JSON."
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "Color scheme",
+      "default": "scheme-1"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Print zone tester"
+    }
+  ]
+}
+{% endschema %}
