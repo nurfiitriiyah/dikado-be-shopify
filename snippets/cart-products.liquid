@@ -28,12 +28,12 @@
   </script>
 {% endif %}
 
-{% comment %}
-  The checkout selector needs every cart line (including hidden print fees and
-  automatic hamper packaging) to preview the same total that will be kept by
-  cart-checkout-selection.js during checkout preparation.
-{% endcomment %}
-<script type="application/json" data-cart-checkout-prices>
+<script
+  type="application/json"
+  data-cart-checkout-prices
+  data-money-format="{% if settings.currency_code_enabled_cart_total %}{{ shop.money_with_currency_format | escape }}{% else %}{{ shop.money_format | escape }}{% endif %}"
+  data-currency="{{ cart.currency.iso_code | escape }}"
+>
   [
     {%- for item in cart.items -%}
       {

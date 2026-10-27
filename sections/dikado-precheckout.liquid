@@ -23,6 +23,7 @@
       data-api-base="/apps/dikado-address"
       data-origin-district-id="1330"
       data-couriers="{{ section.settings.couriers | escape }}"
+      data-shipping-mode="{{ section.settings.shipping_mode | default: 'flat' | escape }}"
       data-checkout-url="{{ routes.root_url }}checkout"
       data-storefront-api-url="/api/2026-07/graphql.json"
       data-loader-id="{{ precheckout_loader_id }}"
@@ -35,15 +36,22 @@
             <div data-address-status role="status" aria-live="polite">Memuat alamat…</div>
             <div class="dikado-address-list" data-address-list></div>
           </section>
-          <section class="dikado-panel" aria-labelledby="DikadoShippingHeading">
-            <div class="dikado-panel__heading"><div><span class="dikado-step">2</span><h2 id="DikadoShippingHeading">Estimasi ongkir</h2></div></div>
-            <div data-shipping-status role="status" aria-live="polite"></div>
-            <div class="dikado-shipping-list" data-shipping-list></div>
-          </section>
+          {% if section.settings.shipping_mode == 'carrier' %}
+            <section class="dikado-panel" aria-labelledby="DikadoShippingHeading">
+              <div class="dikado-panel__heading"><div><span class="dikado-step">2</span><h2 id="DikadoShippingHeading">Pilih ongkir RajaOngkir</h2></div></div>
+              <div data-shipping-status role="status" aria-live="polite"></div>
+              <div class="dikado-shipping-list" data-shipping-list></div>
+            </section>
+          {% else %}
+            <div hidden>
+              <div data-shipping-status role="status" aria-live="polite"></div>
+              <div data-shipping-list></div>
+            </div>
+          {% endif %}
         </div>
         <aside class="dikado-panel dikado-shipping-summary" aria-labelledby="DikadoShippingSummaryHeading">
-          <h2 id="DikadoShippingSummaryHeading">Ongkir terpilih</h2>
-          <p class="dikado-shipping-summary__empty" data-selected-shipping-empty>Pilih alamat untuk melihat layanan pengiriman.</p>
+          <h2 id="DikadoShippingSummaryHeading">{% if section.settings.shipping_mode == 'carrier' %}Ongkir terpilih{% else %}Lanjut ke pembayaran{% endif %}</h2>
+          <p class="dikado-shipping-summary__empty" data-selected-shipping-empty>{% if section.settings.shipping_mode == 'carrier' %}Pilih alamat untuk melihat layanan pengiriman.{% else %}Ongkir final akan ditampilkan di Shopify Checkout.{% endif %}</p>
           <div class="dikado-shipping-summary__selection" data-selected-shipping hidden>
             <strong data-selected-shipping-name></strong>
             <p class="dikado-muted" data-selected-shipping-etd hidden></p>
@@ -61,7 +69,7 @@
           <p class="dikado-form-error" data-form-error role="alert" hidden></p>
           <div class="dikado-form-grid">
             <label>Label alamat<input name="label" maxlength="50" required></label>
-            <label>Nama penerima<input name="recipient_name" maxlength="120" required></label>
+            <label>Nama penerima<input name="recipient_name" maxlength="120" pattern="\S+(?:\s+\S+)+" title="Masukkan minimal 2 kata, contoh: ALISA OK" required></label>
             <label>Nomor telepon<input name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="30" pattern="[+0-9() .-]{8,30}" placeholder="Contoh: 0822 4624 1501" required></label>
             <label class="dikado-form-grid__wide">Alamat lengkap<textarea name="address_line" maxlength="500" rows="3" required></textarea></label>
             <label class="dikado-form-grid__wide">Patokan (opsional)<input name="direction" maxlength="250"></label>
@@ -86,6 +94,7 @@
   "name": "Dikado pre-checkout",
   "settings": [
     {"type":"text","id":"heading","label":"Heading","default":"Pilih Pengiriman"},
+    {"type":"select","id":"shipping_mode","label":"Shipping mode","options":[{"value":"flat","label":"Shopify manual/flat shipping rates"},{"value":"carrier","label":"Dikado RajaOngkir Carrier Service"}],"default":"flat"},
     {"type":"text","id":"couriers","label":"RajaOngkir couriers","default":"jne:sicepat"},
     {"type":"color_scheme","id":"color_scheme","label":"Color scheme","default":"scheme-1"}
   ],

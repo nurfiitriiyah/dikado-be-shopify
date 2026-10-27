@@ -7,6 +7,7 @@
   var preparing = false;
   var prepared = false;
   var initialized = false;
+  var selectionSyncScheduled = false;
   var knownKeys = new Set();
 
   function rootPath() {
@@ -126,10 +127,32 @@
   function updateSelectedTotal() {
     var total = selectedTotal();
     if (total === null) return;
-    document.querySelectorAll('[data-cart-selected-total]').forEach(function (element) {
-      var formatted = formatMoney(total, element.dataset.moneyFormat || '{{amount}}', element.dataset.currency || '');
-      element.textContent = formatted;
-      element.setAttribute('value', formatted);
+    var priceData = document.querySelector('[data-cart-checkout-prices]');
+    var moneyFormat = priceData && priceData.dataset.moneyFormat || '{{amount}}';
+    var currency = priceData && priceData.dataset.currency || '';
+    var formatted = formatMoney(total, moneyFormat, currency);
+    document.querySelectorAll('[data-cart-subtotal]').forEach(function (element) {
+      if (element.textContent.trim() !== formatted) element.textContent = formatted;
+      if (element.getAttribute('value') !== formatted) element.setAttribute('value', formatted);
+    });
+  }
+
+  function containsSelectionUI(node) {
+    if (!node || node.nodeType !== 1) return false;
+    var selector = '[data-cart-checkout-line], [data-cart-checkout-prices], [data-cart-subtotal]';
+    return node.matches(selector) || Boolean(node.querySelector(selector));
+  }
+
+  function onCartMutations(records) {
+    var relevant = records.some(function (record) {
+      return Array.from(record.addedNodes).some(containsSelectionUI) ||
+        Array.from(record.removedNodes).some(containsSelectionUI);
+    });
+    if (!relevant || selectionSyncScheduled) return;
+    selectionSyncScheduled = true;
+    Promise.resolve().then(function () {
+      selectionSyncScheduled = false;
+      initializeSelection();
     });
   }
 
@@ -305,7 +328,7 @@
   };
   document.addEventListener('change', onChange);
   document.addEventListener('submit', onSubmit, true);
-  var observer = new MutationObserver(initializeSelection);
+  var observer = new MutationObserver(onCartMutations);
   observer.observe(document.body, { childList: true, subtree: true });
   initializeSelection();
   if (!isCheckoutFlowPath()) {

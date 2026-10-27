@@ -10,6 +10,11 @@
   };
   var escapeHtml = function (value) { return String(value == null ? '' : value).replace(/[&<>'"]/g, function (character) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]; }); };
   var validId = function (value) { return Number.isSafeInteger(Number(value)) && Number(value) > 0; };
+  var checkoutError = function (message) {
+    var error = new Error(message);
+    error.isCheckoutSafe = true;
+    return error;
+  };
   var stableCarrierServiceCode = function (courier, service) {
     var normalized = (String(courier || '') + '_' + String(service || '')).toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     return normalized ? ('DIKADO_' + normalized).slice(0, 100) : '';
@@ -36,6 +41,7 @@
       this.apiBase = this.dataset.apiBase;
       this.originDistrictId = Number(this.dataset.originDistrictId);
       this.couriers = this.dataset.couriers || 'jne:sicepat';
+      this.shippingMode = this.dataset.shippingMode === 'carrier' ? 'carrier' : 'flat';
       this.addresses = []; this.cart = null; this.selectedAddressId = ''; this.shippingOptions = []; this.selectedShipping = null;
       this.requestSerial = { addresses: 0, cart: 0, shipping: 0, locations: 0 };
       this.controllers = {};
@@ -97,7 +103,7 @@
         this.pageReady = true;
         if (this.pageContent) this.pageContent.hidden = false;
         if (this.fullScreenLoader) this.fullScreenLoader.hide();
-        if (this.selectedAddressId) this.calculateShipping();
+        if (this.selectedAddressId && this.isCarrierMode()) this.calculateShipping();
       } catch (error) {
         if (serial !== this.pageLoadSerial) return;
         ['initialAddresses', 'initialCart'].forEach(function (bucket) {
@@ -155,7 +161,7 @@
           this.selectedAddressId = preferred ? preferred.id : '';
         }
         status.hidden = true; this.renderAddresses(); this.invalidateShipping(); this.updateActions();
-        if (this.selectedAddressId) this.calculateShipping();
+        if (this.selectedAddressId && this.isCarrierMode()) this.calculateShipping();
       } catch (error) {
         if (error.name === 'AbortError') return;
         console.error('[Dikado pre-checkout] Address refresh failed.', error);
@@ -193,7 +199,7 @@
         var cart = await this.fetchCart('cart');
         if (serial !== this.requestSerial.cart) return;
         this.cart = cart; this.invalidateShipping(); this.updateActions();
-        if (this.selectedAddressId) this.calculateShipping();
+        if (this.selectedAddressId && this.isCarrierMode()) this.calculateShipping();
       } catch (error) {
         if (error.name === 'AbortError') return;
         console.error('[Dikado pre-checkout] Cart refresh failed.', error);
@@ -204,6 +210,7 @@
     invalidateShipping() { ++this.requestSerial.shipping; if (this.controllers.shipping) this.controllers.shipping.abort(); this.calculating = false; this.shippingOptions = []; this.selectedShipping = null; this.querySelector('[data-shipping-list]').innerHTML = ''; this.querySelector('[data-shipping-status]').textContent = ''; this.querySelector('[data-shipping-status]').className = ''; this.updateShippingSummary(); this.updateActions(); }
 
     async calculateShipping() {
+      if (!this.isCarrierMode()) return;
       if (this.calculating) return; var address = this.selectedAddress();
       if (!address || !validId(address.district_id)) return this.shippingError('Pilih alamat dengan Kecamatan yang valid.');
       if (!this.cart || !this.cart.items.length) return this.shippingError('Keranjang Anda kosong.');
@@ -213,7 +220,12 @@
         var payload = await this.api('/rajaongkir/quotes', { method: 'POST', body: JSON.stringify({ address_id: address.id, lines: lines, courier: this.couriers }) }, 'shipping');
         if (serial !== this.requestSerial.shipping) return;
         this.shippingOptions = Array.isArray(payload.data) ? payload.data : []; this.selectedShipping = this.shippingOptions[0] || null; this.renderShipping();
-      } catch (error) { if (error.name !== 'AbortError') this.shippingError(error.message || 'Ongkir tidak dapat dihitung.'); }
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('[Dikado pre-checkout] Shipping estimate failed.', error);
+          this.shippingError(this.isCarrierMode() ? 'Ongkir belum dapat dihitung. Silakan coba lagi.' : 'Estimasi ongkir RajaOngkir belum tersedia. Anda tetap dapat melanjutkan; biaya final akan ditampilkan di Shopify Checkout.');
+        }
+      }
       finally { if (serial === this.requestSerial.shipping) { this.calculating = false; this.updateActions(); } }
     }
 
@@ -227,6 +239,7 @@
 
     shippingError(message) { this.querySelector('[data-shipping-status]').textContent = message; this.querySelector('[data-shipping-status]').className = 'dikado-status-error'; }
     selectedAddress() { return this.addresses.find(function (address) { return address.id === this.selectedAddressId; }, this); }
+    isCarrierMode() { return (this.shippingMode || (this.dataset && this.dataset.shippingMode)) === 'carrier'; }
     updateShippingSummary() {
       var empty = this.querySelector('[data-selected-shipping-empty]');
       var selection = this.querySelector('[data-selected-shipping]');
@@ -239,7 +252,7 @@
       etd.hidden = !this.selectedShipping.etd;
       this.querySelector('[data-shipping-price]').textContent = money(this.selectedShipping.price, this.cart && this.cart.currency);
     }
-    updateActions() { var address = this.selectedAddress(); this.querySelector('[data-continue]').disabled = this.continuing || this.calculating || !this.cart || !this.cart.items.length || !address || !validId(address.district_id) || !this.selectedShipping; }
+    updateActions() { var address = this.selectedAddress(); this.querySelector('[data-continue]').disabled = this.continuing || this.calculating || !this.cart || !this.cart.items.length || !address || !validId(address.district_id) || (this.isCarrierMode() && !this.selectedShipping); }
 
     cartUrl(path) { return ((window.Shopify && Shopify.routes && Shopify.routes.root) || '/') + path; }
 
@@ -262,7 +275,7 @@
       var raw = await response.text();
       var payloads;
       try { payloads = parseStorefrontPayloads(raw, response.headers.get('content-type')); }
-      catch (_) { throw new Error('Respons Shopify tidak dapat dibaca. Silakan coba lagi.'); }
+      catch (_) { throw checkoutError('Respons Shopify tidak dapat dibaca. Silakan coba lagi.'); }
       var graphError = '';
       payloads.some(function (payload) {
         if (Array.isArray(payload.errors) && payload.errors[0]) { graphError = payload.errors[0].message || ''; return true; }
@@ -272,15 +285,15 @@
           return true;
         });
       });
-      if (!response.ok || graphError || !payloads.length) throw new Error(graphError || 'Shopify tidak dapat menyiapkan checkout.');
+      if (!response.ok || graphError || !payloads.length) throw checkoutError('Shopify tidak dapat menyiapkan checkout. Silakan coba lagi.');
       return payloads;
     }
 
     async selectCartDeliveryAddress(address) {
-      if (!address || typeof address !== 'object') throw new Error('Alamat checkout dari server tidak valid.');
+      if (!address || typeof address !== 'object') throw checkoutError('Alamat checkout dari server tidak valid.');
       var cart = await this.currentCart();
       var token = String(cart.token || '').trim();
-      if (!token) throw new Error('ID keranjang Shopify tidak tersedia. Muat ulang halaman lalu coba lagi.');
+      if (!token) throw checkoutError('ID keranjang Shopify tidak tersedia. Muat ulang halaman lalu coba lagi.');
       var cartId = token.indexOf('gid://shopify/Cart/') === 0 ? token : 'gid://shopify/Cart/' + token;
       var query = 'mutation DikadoSelectDeliveryAddress($cartId: ID!, $addresses: [CartSelectableAddressInput!]!) { cartDeliveryAddressesReplace(cartId: $cartId, addresses: $addresses) { cart { id checkoutUrl } userErrors { field message } } }';
       var payloads = await this.storefront(query, {
@@ -291,7 +304,7 @@
       var result = payload && payload.data && payload.data.cartDeliveryAddressesReplace;
       var userError = result && Array.isArray(result.userErrors) && result.userErrors[0] && result.userErrors[0].message;
       if (userError || !result || !result.cart || !result.cart.id || !result.cart.checkoutUrl) {
-        throw new Error(userError || 'Alamat terpilih tidak dapat dipasang ke checkout Shopify.');
+        throw checkoutError(userError || 'Alamat terpilih tidak dapat dipasang ke checkout Shopify.');
       }
       return { cartId: result.cart.id, checkoutUrl: result.cart.checkoutUrl };
     }
@@ -312,7 +325,7 @@
         });
       });
       var nodes = groups && Array.isArray(groups.nodes) ? groups.nodes : [];
-      if (!cart || !cart.checkoutUrl || !nodes.length) throw new Error('Shopify belum mengembalikan pilihan pengiriman untuk alamat ini.');
+      if (!cart || !cart.checkoutUrl || !nodes.length) throw checkoutError('Shopify belum mengembalikan pilihan pengiriman untuk alamat ini.');
       return { cartId: cart.id || cartId, checkoutUrl: cart.checkoutUrl, groups: nodes };
     }
 
@@ -331,7 +344,7 @@
         return option && group.id && option.handle ? { deliveryGroupId: group.id, deliveryOptionHandle: option.handle } : null;
       });
       if (!expectedCode || !selections.length || selections.some(function (selection) { return !selection; })) {
-        throw new Error('Layanan ' + String(shipping.courier || '') + ' · ' + String(shipping.service || '') + ' belum tersedia di Shopify Checkout. Pastikan Dikado RajaOngkir aktif sebagai rate Carrier or app calculated pada shipping profile zona Indonesia, lalu hitung ongkir lagi.');
+        throw checkoutError('Layanan ' + String(shipping.courier || '') + ' · ' + String(shipping.service || '') + ' belum tersedia di Shopify Checkout. Pastikan Dikado RajaOngkir aktif sebagai rate Carrier or app calculated pada shipping profile zona Indonesia, lalu hitung ongkir lagi.');
       }
       return selections;
     }
@@ -341,13 +354,13 @@
       var payload = (await this.storefront(query, { cartId: cartId, selectedDeliveryOptions: selections }))[0];
       var result = payload && payload.data && payload.data.cartSelectedDeliveryOptionsUpdate;
       var userError = result && Array.isArray(result.userErrors) && result.userErrors[0] && result.userErrors[0].message;
-      if (userError || !result || !result.cart || !result.cart.checkoutUrl) throw new Error(userError || 'Pilihan ongkir tidak dapat dipasang ke Shopify Checkout.');
+      if (userError || !result || !result.cart || !result.cart.checkoutUrl) throw checkoutError(userError || 'Pilihan ongkir tidak dapat dipasang ke Shopify Checkout.');
       var selectedGroups = result.cart.deliveryGroups && Array.isArray(result.cart.deliveryGroups.nodes) ? result.cart.deliveryGroups.nodes : [];
       if (selectedGroups.length !== selections.length || selections.some(function (selection) {
         var group = selectedGroups.find(function (candidate) { return candidate.id === selection.deliveryGroupId; });
         return !group || !group.selectedDeliveryOption || group.selectedDeliveryOption.handle !== selection.deliveryOptionHandle;
       })) {
-        throw new Error('Shopify belum menyimpan pilihan ongkir. Silakan coba lagi.');
+        throw checkoutError('Shopify belum menyimpan pilihan ongkir. Silakan coba lagi.');
       }
       return result.cart.checkoutUrl;
     }
@@ -360,14 +373,14 @@
     }
 
     async changeLineProperties(item, properties) {
-      if (!item || typeof item.key !== 'string' || !item.key) throw new Error('Baris produk fisik tidak dapat diperbarui.');
+      if (!item || typeof item.key !== 'string' || !item.key) throw checkoutError('Metadata ongkir pada produk tidak dapat diperbarui. Muat ulang halaman lalu coba lagi.');
       var response = await fetch(this.cartUrl('cart/change.js'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ id: item.key, quantity: item.quantity, properties: properties })
+        body: JSON.stringify({ id: item.key, properties: properties })
       });
       var cart = await response.json().catch(function () { return null; });
-      if (!response.ok || !cart || !Array.isArray(cart.items)) throw new Error('Pilihan ongkir tidak dapat ditempelkan ke produk.');
+      if (!response.ok || !cart || !Array.isArray(cart.items)) throw checkoutError('Metadata ongkir pada produk tidak dapat diperbarui. Muat ulang halaman lalu coba lagi.');
       return cart;
     }
 
@@ -401,6 +414,38 @@
       throw new Error('Pilihan ongkir tidak dapat disimpan tanpa mengubah isi keranjang.');
     }
 
+    async clearCarrierMetadata() {
+      var propertyName = '_dikado_shipping_quote_id';
+      var attributeNames = ['_dikado_shipping_quote_id', 'dikado_destination_district_id', 'dikado_shipping_courier', 'dikado_shipping_service'];
+      var cart = await this.currentCart();
+      var maxChanges = cart.items.length + 1;
+      for (var attempt = 0; attempt < maxChanges; attempt += 1) {
+        var item = cart.items.find(function (candidate) { return candidate.properties && Object.prototype.hasOwnProperty.call(candidate.properties, propertyName); });
+        if (!item) break;
+        var properties = Object.assign({}, item.properties || {});
+        delete properties[propertyName];
+        cart = await this.changeLineProperties(item, properties);
+      }
+      if (cart.items.some(function (item) { return item.properties && Object.prototype.hasOwnProperty.call(item.properties, propertyName); })) {
+        throw checkoutError('Metadata ongkir lama belum dapat dibersihkan. Muat ulang halaman lalu coba lagi.');
+      }
+      var attributes = {};
+      attributeNames.forEach(function (name) { attributes[name] = ''; });
+      var response = await fetch(this.cartUrl('cart/update.js'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ attributes: attributes })
+      });
+      cart = await response.json().catch(function () { return null; });
+      if (!response.ok || !cart || !Array.isArray(cart.items)) throw checkoutError('Metadata ongkir lama belum dapat dibersihkan. Muat ulang halaman lalu coba lagi.');
+      var remainingAttributes = cart.attributes || {};
+      var metadataRemains = attributeNames.some(function (name) { return Boolean(remainingAttributes[name]); });
+      var propertyRemains = cart.items.some(function (item) { return item.properties && Object.prototype.hasOwnProperty.call(item.properties, propertyName); });
+      if (metadataRemains || propertyRemains) throw checkoutError('Metadata ongkir lama belum dapat dibersihkan. Muat ulang halaman lalu coba lagi.');
+      this.cart = cart;
+      return cart;
+    }
+
     async onClick(event) {
       var add = event.target.closest('[data-add-address]'); if (add) return this.openAddressModal();
       var edit = event.target.closest('[data-edit-address]'); if (edit) { event.preventDefault(); return this.openAddressModal(edit.dataset.editAddress); }
@@ -410,7 +455,7 @@
     }
 
     onChange(event) {
-      if (event.target.name === 'dikado-address') { this.selectedAddressId = event.target.value; this.renderAddresses(); this.invalidateShipping(); this.calculateShipping(); }
+      if (event.target.name === 'dikado-address') { this.selectedAddressId = event.target.value; this.renderAddresses(); this.invalidateShipping(); if (this.isCarrierMode()) this.calculateShipping(); }
       if (event.target.name === 'dikado-shipping') { this.selectedShipping = this.shippingOptions[Number(event.target.value)] || null; this.renderShipping(); }
       if (event.target.name === 'province_id') this.locationChanged('cities', event.target.value);
       if (event.target.name === 'city_id') this.locationChanged('districts', event.target.value);
@@ -476,7 +521,7 @@
 
     async continueCheckout() {
       if (this.continuing) return; var address = this.selectedAddress(); var error = this.querySelector('[data-checkout-error]'); error.hidden = true;
-      if (!this.cart || !this.cart.items.length || !address || !validId(address.district_id) || !this.selectedShipping) { error.textContent = 'Lengkapi alamat dan pilih estimasi pengiriman terlebih dahulu.'; error.hidden = false; return; }
+      if (!this.cart || !this.cart.items.length || !address || !validId(address.district_id) || (this.isCarrierMode() && !this.selectedShipping)) { error.textContent = this.isCarrierMode() ? 'Lengkapi alamat dan pilih estimasi pengiriman terlebih dahulu.' : 'Lengkapi alamat pengiriman terlebih dahulu.'; error.hidden = false; return; }
       this.continuing = true; this.loaderRetryMode = 'checkout'; var attempt = ++this.checkoutAttempt; var button = this.querySelector('[data-continue]'); button.textContent = 'Menyiapkan checkout…'; this.updateActions();
       if (this.pageContent) this.pageContent.hidden = true;
       if (this.fullScreenLoader) this.fullScreenLoader.showLoading('Menyiapkan checkout…', 'Bentar ya, kita cek alamat, ongkir, dan pesananmu dulu 🎁');
@@ -484,23 +529,31 @@
       this.checkoutController = new AbortController();
       this.checkoutTimeout = window.setTimeout(function () { timedOut = true; this.checkoutController.abort(); }.bind(this), this.checkoutTimeoutMs || CHECKOUT_TIMEOUT_MS);
       try {
-        if (!this.selectedShipping.quote_id) throw new Error('Quote ongkir tidak valid. Silakan hitung ulang.');
         var requestOptions = { method: 'POST', body: '{}', signal: this.checkoutController.signal };
-        var results = await Promise.all([
-          this.api('/rajaongkir/addresses/' + encodeURIComponent(address.id) + '/sync', requestOptions),
-          this.api('/rajaongkir/quotes/' + encodeURIComponent(this.selectedShipping.quote_id) + '/select', requestOptions),
-        ]);
-        var sync = results[0];
+        var sync;
+        if (this.isCarrierMode()) {
+          if (!this.selectedShipping.quote_id) throw checkoutError('Quote ongkir tidak valid. Silakan hitung ulang.');
+          var results = await Promise.all([
+            this.api('/rajaongkir/addresses/' + encodeURIComponent(address.id) + '/sync', requestOptions),
+            this.api('/rajaongkir/quotes/' + encodeURIComponent(this.selectedShipping.quote_id) + '/select', requestOptions),
+          ]);
+          sync = results[0];
+          var selection = results[1];
+          var quoteId = selection && selection.data && selection.data.id;
+          if (!quoteId) throw checkoutError('Quote ongkir tidak dapat dipilih.');
+          await this.attachQuoteToPhysicalLine(quoteId);
+          var attributes = { _dikado_shipping_quote_id: quoteId, dikado_address_id: address.id, dikado_destination_district_id: String(address.district_id), dikado_shipping_courier: this.selectedShipping.courier_code || this.selectedShipping.courier, dikado_shipping_service: this.selectedShipping.service_code || this.selectedShipping.service };
+          var response = await fetch(this.cartUrl('cart/update.js'), { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ attributes: attributes }) });
+          if (!response.ok) throw checkoutError('Pilihan checkout tidak dapat disimpan.');
+        } else {
+          await this.clearCarrierMetadata();
+          sync = await this.api('/rajaongkir/addresses/' + encodeURIComponent(address.id) + '/sync', requestOptions);
+        }
         var checkoutAddress = sync && sync.data && sync.data.checkout_address;
-        if (!checkoutAddress) throw new Error('Alamat checkout tidak diterima dari server.');
-        var selection = results[1];
-        var quoteId = selection && selection.data && selection.data.id;
-        if (!quoteId) throw new Error('Quote ongkir tidak dapat dipilih.');
-        await this.attachQuoteToPhysicalLine(quoteId);
-        var attributes = { _dikado_shipping_quote_id: quoteId, dikado_address_id: address.id, dikado_destination_district_id: String(address.district_id), dikado_shipping_courier: this.selectedShipping.courier_code || this.selectedShipping.courier, dikado_shipping_service: this.selectedShipping.service_code || this.selectedShipping.service };
-        var response = await fetch(this.cartUrl('cart/update.js'), { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ attributes: attributes }) });
-        if (!response.ok) throw new Error('Pilihan checkout tidak dapat disimpan.');
-        var checkoutUrl = await this.prepareShopifyCheckout(checkoutAddress, this.selectedShipping);
+        if (!checkoutAddress) throw checkoutError('Alamat checkout tidak diterima dari server.');
+        var checkoutUrl;
+        if (this.isCarrierMode()) checkoutUrl = await this.prepareShopifyCheckout(checkoutAddress, this.selectedShipping);
+        else checkoutUrl = (await this.selectCartDeliveryAddress(checkoutAddress)).checkoutUrl;
         if (attempt !== this.checkoutAttempt) return;
         window.clearTimeout(this.checkoutTimeout); this.checkoutTimeout = null;
         window.location.assign(checkoutUrl || this.dataset.checkoutUrl || '/checkout');
@@ -508,7 +561,11 @@
         if (attempt !== this.checkoutAttempt) return;
         console.error('[Dikado pre-checkout] Checkout preparation failed.', exception);
         window.clearTimeout(this.checkoutTimeout); this.checkoutTimeout = null; this.checkoutController = null;
-        var message = timedOut ? 'Menyiapkan checkout terlalu lama. Periksa koneksi Anda lalu coba lagi.' : 'Checkout belum dapat disiapkan. Silakan coba lagi.';
+        var message = timedOut
+          ? 'Menyiapkan checkout terlalu lama. Periksa koneksi Anda lalu coba lagi.'
+          : (exception && exception.isCheckoutSafe && exception.message
+            ? exception.message
+            : 'Checkout belum dapat disiapkan. Silakan coba lagi.');
         if (this.fullScreenLoader) this.fullScreenLoader.showError(message);
         else { if (this.pageContent) this.pageContent.hidden = false; error.textContent = message; error.hidden = false; }
         this.continuing = false; button.textContent = 'Lanjut ke pembayaran'; this.updateActions();
