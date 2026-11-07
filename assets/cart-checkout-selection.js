@@ -8,7 +8,7 @@
   var prepared = false;
   var initialized = false;
   var selectionSyncScheduled = false;
-  var knownKeys = new Set();
+  var selectionLines = [];
 
   function rootPath() {
     return (window.Shopify && Shopify.routes && Shopify.routes.root) || '/';
@@ -42,33 +42,110 @@
     if (selected) return selected;
     try {
       var stored = sessionStorage.getItem(SELECTION_KEY);
-      selected = stored === null ? null : new Set(JSON.parse(stored));
+      if (stored === null) {
+        selected = null;
+      } else {
+        var parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          // Backwards compatibility with the original key-only storage format.
+          selected = new Set(parsed.map(String));
+          selectionLines = [];
+        } else {
+          selectionLines = Array.isArray(parsed.lines) ? parsed.lines : [];
+          selected = new Set(selectionLines.filter(function (line) { return line.selected; }).map(function (line) { return String(line.key); }));
+        }
+      }
     } catch (_) {
       selected = null;
+      selectionLines = [];
     }
     return selected;
   }
 
   function writeSelection() {
-    try { sessionStorage.setItem(SELECTION_KEY, JSON.stringify(Array.from(selected || []))); } catch (_) {}
+    try {
+      sessionStorage.setItem(SELECTION_KEY, JSON.stringify({ version: 2, lines: selectionLines }));
+    } catch (_) {}
   }
 
-  function visibleKeys() {
-    return Array.from(document.querySelectorAll('[data-cart-checkout-line]')).map(function (input) { return input.value; });
+  function inputDescriptor(input) {
+    return {
+      key: String(input.value),
+      line: Number(input.dataset.cartLine || (input.closest('[data-line]') && input.closest('[data-line]').dataset.line) || 0),
+      variantId: String(input.dataset.variantId || ''),
+      identity: JSON.stringify([
+        String(input.dataset.variantId || ''),
+        String(input.dataset.sellingPlanId || ''),
+        String(input.dataset.designId || ''),
+        String(input.dataset.photoUploadId || ''),
+        String(input.dataset.hamperId || '')
+      ])
+    };
+  }
+
+  function visibleLines() {
+    var byKey = new Map();
+    document.querySelectorAll('[data-cart-checkout-line]').forEach(function (input) {
+      var line = inputDescriptor(input);
+      // Cart page and cart drawer may render the same Shopify line at once.
+      if (!byKey.has(line.key)) byKey.set(line.key, line);
+    });
+    return Array.from(byKey.values());
+  }
+
+  function closestIdentityMatch(lines, current, used) {
+    var bestIndex = -1;
+    var bestDistance = Infinity;
+    lines.forEach(function (line, index) {
+      if (used.has(index) || line.identity !== current.identity) return;
+      var distance = Math.abs(Number(line.line || 0) - current.line);
+      if (distance < bestDistance) {
+        bestIndex = index;
+        bestDistance = distance;
+      }
+    });
+    return bestIndex;
   }
 
   function initializeSelection() {
     var stored = readSelection();
-    var keys = visibleKeys();
-    if (stored === null) {
-      selected = new Set(keys);
-      writeSelection();
-    } else if (initialized) {
-      // A genuinely new cart line defaults to selected. Section rerenders keep
-      // the same line keys and therefore preserve the customer's choice.
-      keys.forEach(function (key) { if (!knownKeys.has(key)) selected.add(key); });
+    var currentLines = visibleLines();
+    // The cart page and drawer can be morphed independently. Do not erase a
+    // valid snapshot during the brief interval where neither set of inputs is
+    // present (or in a non-cart test/checkout document).
+    if (!currentLines.length) {
+      syncInputs();
+      return;
     }
-    keys.forEach(function (key) { knownKeys.add(key); });
+    if (stored === null) {
+      selectionLines = currentLines.map(function (line) { return Object.assign({}, line, { selected: true }); });
+    } else if (!selectionLines.length) {
+      // Upgrade a legacy key-only snapshot while the original DOM is available.
+      selectionLines = currentLines.map(function (line) {
+        return Object.assign({}, line, { selected: stored.has(line.key) });
+      });
+    } else {
+      var previous = selectionLines;
+      var used = new Set();
+      selectionLines = currentLines.map(function (line) {
+        var match = previous.findIndex(function (oldLine, index) {
+          return !used.has(index) && String(oldLine.key) === line.key;
+        });
+        if (match === -1) match = closestIdentityMatch(previous, line, used);
+        if (match === -1 && initialized) {
+          match = previous.findIndex(function (oldLine, index) {
+            return !used.has(index) &&
+              Number(oldLine.line) === line.line &&
+              String(oldLine.variantId || '') === line.variantId;
+          });
+        }
+        if (match === -1) return Object.assign({}, line, { selected: true });
+        used.add(match);
+        return Object.assign({}, line, { selected: Boolean(previous[match].selected) });
+      });
+    }
+    selected = new Set(selectionLines.filter(function (line) { return line.selected; }).map(function (line) { return line.key; }));
+    writeSelection();
     initialized = true;
     syncInputs();
   }
@@ -160,8 +237,12 @@
     var input = event.target.closest('[data-cart-checkout-line]');
     if (!input) return;
     if (!selected) selected = new Set();
-    if (input.checked) selected.add(input.value);
-    else selected.delete(input.value);
+    var descriptor = inputDescriptor(input);
+    var matchingLines = selectionLines.filter(function (candidate) { return candidate.key === descriptor.key; });
+    matchingLines.forEach(function (line) { line.selected = input.checked; });
+    if (!matchingLines.length) selectionLines.push(Object.assign({}, descriptor, { selected: input.checked }));
+    if (input.checked) selected.add(descriptor.key);
+    else selected.delete(descriptor.key);
     writeSelection();
     syncInputs();
   }
@@ -171,8 +252,18 @@
     return selection === null || selection.has(key);
   }
 
+  function checkedLineIndexes() {
+    return new Set(Array.from(document.querySelectorAll('[data-cart-checkout-line]:checked')).map(function (input) {
+      var row = input.closest('[data-line]');
+      return row ? Number(row.dataset.line) : 0;
+    }).filter(Boolean));
+  }
+
   function setSelected(keys) {
     selected = new Set(Array.from(keys || []).map(String));
+    selectionLines = visibleLines().map(function (line) {
+      return Object.assign({}, line, { selected: selected.has(line.key) });
+    });
     prepared = false;
     writeSelection();
     syncInputs();
@@ -205,11 +296,17 @@
       var selection = readSelection();
       if (selection === null) return cart;
 
-      var mainItems = cart.items.filter(function (item) {
+      var checkedIndexes = checkedLineIndexes();
+      var cartLines = cart.items.map(function (item, index) { return { item: item, line: index + 1 }; });
+      var mainItems = cartLines.filter(function (entry) {
+        var item = entry.item;
         var props = item.properties || {};
         return props._item_type !== 'print_fee' && props._hamper_role !== 'packaging';
       });
-      var selectedMain = mainItems.filter(function (item) { return selection.has(item.key); });
+      var selectedMainEntries = mainItems.filter(function (entry) {
+        return selection.has(entry.item.key) || checkedIndexes.has(entry.line);
+      });
+      var selectedMain = selectedMainEntries.map(function (entry) { return entry.item; });
       if (!selectedMain.length) throw new Error('Pilih minimal satu produk untuk checkout.');
 
       var selectedDesigns = new Set(selectedMain.map(function (item) {
@@ -245,6 +342,9 @@
         var props = item.properties || {};
         return props._item_type !== 'print_fee' && props._hamper_role !== 'packaging';
       }).map(function (item) { return item.key; }));
+      selectionLines = selectionLines.filter(function (line) { return selected.has(line.key); }).map(function (line) {
+        return Object.assign({}, line, { selected: true });
+      });
       writeSelection();
       prepared = true;
       return updatedCart;
@@ -290,6 +390,7 @@
     localStorage.removeItem(RESTORE_KEY);
     sessionStorage.removeItem(SELECTION_KEY);
     selected = null;
+    selectionLines = [];
     prepared = false;
   }
 

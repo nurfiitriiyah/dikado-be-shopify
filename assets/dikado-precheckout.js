@@ -3,6 +3,10 @@
 
   var INITIAL_LOAD_TIMEOUT_MS = 15000;
   var CHECKOUT_TIMEOUT_MS = 45000;
+  var LOCATION_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+  var LOCATION_CACHE_PREFIX = 'dikado:rajaongkir-locations:v1:';
+  var locationMemoryCache = new Map();
+  var locationRequests = new Map();
 
   var money = function (cents, currency) {
     try { return new Intl.NumberFormat(document.documentElement.lang || 'id-ID', { style: 'currency', currency: currency || 'IDR', maximumFractionDigits: 0 }).format(Number(cents || 0) / 100); }
@@ -10,6 +14,11 @@
   };
   var escapeHtml = function (value) { return String(value == null ? '' : value).replace(/[&<>'"]/g, function (character) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]; }); };
   var validId = function (value) { return Number.isSafeInteger(Number(value)) && Number(value) > 0; };
+  var alphabetic = function (values, field) {
+    return values.slice().sort(function (left, right) {
+      return String(left && left[field] || '').localeCompare(String(right && right[field] || ''), 'id-ID', { sensitivity: 'base', numeric: true });
+    });
+  };
   var checkoutError = function (message) {
     var error = new Error(message);
     error.isCheckoutSafe = true;
@@ -146,7 +155,7 @@
     async fetchAddresses(bucket) {
       var payload = await this.api('/rajaongkir/addresses', {}, bucket);
       if (!Array.isArray(payload.data)) throw new Error('Data alamat tidak valid.');
-      return payload.data;
+      return alphabetic(payload.data, 'label');
     }
 
     async loadAddresses() {
@@ -466,7 +475,43 @@
 
     async locations(level, parentId) {
       var params = new URLSearchParams(); if (level === 'cities') params.set('province_id', parentId); if (level === 'districts') params.set('city_id', parentId); if (level === 'subdistricts') params.set('district_id', parentId);
-      var payload = await this.api('/rajaongkir/' + level + (params.toString() ? '?' + params : '')); return Array.isArray(payload.data) ? payload.data : [];
+      var path = '/rajaongkir/' + level + (params.toString() ? '?' + params : '');
+      var cacheKey = LOCATION_CACHE_PREFIX + encodeURIComponent(String(this.apiBase || '')) + ':' + level + ':' + String(parentId || 'root');
+      var now = Date.now();
+      var cached = locationMemoryCache.get(cacheKey) || this.readLocationCache(cacheKey);
+      if (cached && cached.expiresAt > now) return alphabetic(cached.data, 'name');
+      if (locationRequests.has(cacheKey)) return locationRequests.get(cacheKey);
+
+      var request = this.api(path).then(function (payload) {
+        var data = alphabetic(Array.isArray(payload.data) ? payload.data : [], 'name');
+        var entry = { data: data, expiresAt: Date.now() + LOCATION_CACHE_TTL_MS };
+        locationMemoryCache.set(cacheKey, entry);
+        this.writeLocationCache(cacheKey, entry);
+        return data;
+      }.bind(this)).catch(function (error) {
+        if (cached && Array.isArray(cached.data)) return alphabetic(cached.data, 'name');
+        throw error;
+      }).finally(function () {
+        locationRequests.delete(cacheKey);
+      });
+      locationRequests.set(cacheKey, request);
+      return request;
+    }
+
+    readLocationCache(cacheKey) {
+      try {
+        var raw = window.localStorage && window.localStorage.getItem(cacheKey);
+        if (!raw) return null;
+        var entry = JSON.parse(raw);
+        if (!entry || !Array.isArray(entry.data) || !Number.isFinite(entry.expiresAt)) return null;
+        locationMemoryCache.set(cacheKey, entry);
+        return entry;
+      } catch (_) { return null; }
+    }
+
+    writeLocationCache(cacheKey, entry) {
+      try { if (window.localStorage) window.localStorage.setItem(cacheKey, JSON.stringify(entry)); }
+      catch (_) { /* Browsers may disable storage or run out of quota; memory cache still works. */ }
     }
 
     fillSelect(name, values, selected) { var select = this.querySelector('[name="' + name + '"]'); var label = { province_id: 'provinsi', city_id: 'kota/kabupaten', district_id: 'kecamatan', subdistrict_id: 'kelurahan' }[name]; select.innerHTML = '<option value="">Pilih ' + label + '</option>' + values.map(function (value) { return '<option value="' + escapeHtml(value.id) + '" ' + (String(value.id) === String(selected) ? 'selected' : '') + '>' + escapeHtml(value.name) + '</option>'; }).join(''); select.disabled = false; }

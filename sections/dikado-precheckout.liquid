@@ -51,7 +51,7 @@
         </div>
         <aside class="dikado-panel dikado-shipping-summary" aria-labelledby="DikadoShippingSummaryHeading">
           <h2 id="DikadoShippingSummaryHeading">{% if section.settings.shipping_mode == 'carrier' %}Ongkir terpilih{% else %}Lanjut ke pembayaran{% endif %}</h2>
-          <p class="dikado-shipping-summary__empty" data-selected-shipping-empty>{% if section.settings.shipping_mode == 'carrier' %}Pilih alamat untuk melihat layanan pengiriman.{% else %}Ongkir final akan ditampilkan di Shopify Checkout.{% endif %}</p>
+          <p class="dikado-shipping-summary__empty" data-selected-shipping-empty>{% if section.settings.shipping_mode == 'carrier' %}Pilih alamat untuk melihat layanan pengiriman.{% else %}Total ongkir akan dihitung saat checkout.{% endif %}</p>
           <div class="dikado-shipping-summary__selection" data-selected-shipping hidden>
             <strong data-selected-shipping-name></strong>
             <p class="dikado-muted" data-selected-shipping-etd hidden></p>

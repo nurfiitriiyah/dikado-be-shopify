@@ -139,10 +139,18 @@
         assign dikado_precheckout_page = pages['custom-chekout']
       endif
       assign dikado_precheckout_url = dikado_precheckout_page.url | default: '/pages/checkout-dikado'
+      assign dikado_customer_authenticated = false
+      if customer
+        assign dikado_customer_authenticated = true
+      endif
     %}
     <script>
       window.DikadoPrecheckoutUrl = {{ dikado_precheckout_url | json }};
+      window.DikadoLogoutCartConfig = {
+        authenticated: {{ dikado_customer_authenticated | json }}
+      };
     </script>
+    <script src="{{ 'dikado-logout-cart.js' | asset_url }}" defer="defer"></script>
     {% if customer %}
       <script>
         window.DikadoCartSyncConfig = {

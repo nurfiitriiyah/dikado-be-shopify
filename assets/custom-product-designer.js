@@ -112,6 +112,7 @@
 
   function normalizeConfig(config) {
     config = config || {};
+    config.backDesignMode = config.backDesignMode === 'same-only' ? 'same-only' : 'standard';
     if (config.surfaceMode === 'wrap' && (!config.front || !Array.isArray(config.front.zones))) {
       var wrap = config.wrap || {};
       config.front = {
@@ -226,6 +227,9 @@
     this.zoneRects = {};
     this.zoneBoundaries = {};
     this.zoneLabels = {};
+    this.zonePositions = { front: {}, back: {} };
+    this.zoneDrag = null;
+    this.zonePointerHandlers = null;
     this.activeZoneId = null;
     this.side = 'front';
     this.mockupUrl = null;
@@ -243,16 +247,139 @@
       preserveObjectStacking: true,
       controlsAboveOverlay: true,
       selection: false,
-      selectionKey: null
+      selectionKey: null,
+      allowTouchScrolling: true
     });
     this.bindConstraints();
+    this.bindZoneDragging();
   };
 
   CanvasEditor.prototype.dispose = function () {
+    this.unbindZoneDragging();
     if (this.canvas) {
       this.canvas.dispose();
       this.canvas = null;
     }
+  };
+
+  CanvasEditor.prototype.bindZoneDragging = function () {
+    if (!this.canvas || this.zonePointerHandlers) return;
+    var self = this;
+    var element = this.canvas.upperCanvasEl;
+
+    function zoneAtPointer(pointer) {
+      for (var index = self.zones.length - 1; index >= 0; index -= 1) {
+        var id = String(self.zones[index].id);
+        var rect = self.zoneRects[id];
+        if (rect && pointer.x >= rect.left && pointer.x <= rect.left + rect.width &&
+          pointer.y >= rect.top && pointer.y <= rect.top + rect.height) return id;
+      }
+      return null;
+    }
+
+    function hasDesignTarget(event) {
+      var target = self.canvas.findTarget(event, false);
+      return Boolean(target && !target._customizerRole);
+    }
+
+    function updateCursor(event) {
+      if (self.zoneDrag) {
+        element.style.cursor = 'grabbing';
+        return;
+      }
+      if (hasDesignTarget(event)) return;
+      var zoneId = zoneAtPointer(self.canvas.getPointer(event));
+      element.style.cursor = zoneId ? 'grab' : '';
+    }
+
+    function pointerDown(event) {
+      if (event.button != null && event.button !== 0) return;
+      if (hasDesignTarget(event)) return;
+      var pointer = self.canvas.getPointer(event);
+      var zoneId = zoneAtPointer(pointer);
+      if (!zoneId) return;
+      var rect = self.zoneRects[zoneId];
+      self.setActiveZone(zoneId);
+      self.zoneDrag = {
+        pointerId: event.pointerId,
+        zoneId: zoneId,
+        startX: pointer.x,
+        startY: pointer.y,
+        left: rect.left,
+        top: rect.top
+      };
+      element.setPointerCapture(event.pointerId);
+      element.style.cursor = 'grabbing';
+      event.preventDefault();
+    }
+
+    function pointerMove(event) {
+      var drag = self.zoneDrag;
+      if (!drag || drag.pointerId !== event.pointerId) {
+        updateCursor(event);
+        return;
+      }
+      var pointer = self.canvas.getPointer(event);
+      self.moveZone(drag.zoneId, drag.left + pointer.x - drag.startX, drag.top + pointer.y - drag.startY);
+      event.preventDefault();
+    }
+
+    function pointerUp(event) {
+      var drag = self.zoneDrag;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      self.zoneDrag = null;
+      if (element.hasPointerCapture(event.pointerId)) element.releasePointerCapture(event.pointerId);
+      element.style.cursor = '';
+      updateCursor(event);
+      event.preventDefault();
+    }
+
+    this.zonePointerHandlers = { element: element, down: pointerDown, move: pointerMove, up: pointerUp };
+    element.addEventListener('pointerdown', pointerDown);
+    element.addEventListener('pointermove', pointerMove);
+    element.addEventListener('pointerup', pointerUp);
+    element.addEventListener('pointercancel', pointerUp);
+  };
+
+  CanvasEditor.prototype.unbindZoneDragging = function () {
+    var handlers = this.zonePointerHandlers;
+    if (!handlers) return;
+    handlers.element.removeEventListener('pointerdown', handlers.down);
+    handlers.element.removeEventListener('pointermove', handlers.move);
+    handlers.element.removeEventListener('pointerup', handlers.up);
+    handlers.element.removeEventListener('pointercancel', handlers.up);
+    handlers.element.style.cursor = '';
+    this.zonePointerHandlers = null;
+    this.zoneDrag = null;
+  };
+
+  CanvasEditor.prototype.moveZone = function (zoneId, requestedLeft, requestedTop) {
+    zoneId = String(zoneId);
+    var rect = this.zoneRects[zoneId];
+    if (!this.canvas || !rect) return;
+    var left = Math.max(0, Math.min(requestedLeft, this.canvas.getWidth() - rect.width));
+    var top = Math.max(0, Math.min(requestedTop, this.canvas.getHeight() - rect.height));
+    var deltaX = left - rect.left;
+    var deltaY = top - rect.top;
+    if (!deltaX && !deltaY) return;
+
+    rect.left = left;
+    rect.top = top;
+    this.zoneBoundaries[zoneId].set({ left: left, top: top }).setCoords();
+    this.zoneLabels[zoneId].set({ left: left + 8, top: Math.max(2, top + 6) }).setCoords();
+    this.canvas.getObjects().forEach(function (object) {
+      if (!object._customizerRole && String(object._zoneId) === zoneId) {
+        object.set({ left: object.left + deltaX, top: object.top + deltaY });
+        object.setCoords();
+        this.applyZoneClip(object);
+      }
+    }, this);
+    if (!this.zonePositions[this.side]) this.zonePositions[this.side] = {};
+    this.zonePositions[this.side][zoneId] = {
+      x: left / this.canvas.getWidth(),
+      y: top / this.canvas.getHeight()
+    };
+    this.canvas.requestRenderAll();
   };
 
   CanvasEditor.prototype.bindConstraints = function () {
@@ -406,6 +533,11 @@
     zones.forEach(function (zone) {
       var id = String(zone.id);
       var rect = this.zoneManager.toRect(zone, this.canvas.getWidth(), this.canvas.getHeight());
+      var savedPosition = this.zonePositions[this.side] && this.zonePositions[this.side][id];
+      if (savedPosition) {
+        rect.left = Math.max(0, Math.min(savedPosition.x * this.canvas.getWidth(), this.canvas.getWidth() - rect.width));
+        rect.top = Math.max(0, Math.min(savedPosition.y * this.canvas.getHeight(), this.canvas.getHeight() - rect.height));
+      }
       var boundary = new fabric.Rect({
         left: rect.left,
         top: rect.top,
@@ -931,7 +1063,6 @@
     baseForm.append('id', String(payload.variantId));
     baseForm.append('quantity', String(payload.quantity || 1));
     baseForm.append('properties[_design_id]', payload.designId);
-    baseForm.append('properties[Design ID]', payload.designId);
     baseForm.append('properties[_custom_group_id]', payload.designId);
     baseForm.append('properties[_item_type]', 'product');
     baseForm.append('properties[_customized]', 'true');
@@ -1150,6 +1281,7 @@
 
     this.objectUrls = [];
     this.isProcessing = false;
+    this.isDirty = false;
     var self = this;
     this.canvasEditor.onZoneChange = function () {
       self.renderEditorZones();
@@ -1174,16 +1306,49 @@
   CustomizerController.prototype.bind = function () {
     var self = this;
 
-    this.root.querySelector('[data-customizer-close]').addEventListener('click', function () { self.close(); });
+    this.closeButton = this.root.querySelector('[data-customizer-close]');
+    this.closeButton.addEventListener('click', function () { self.requestClose(); });
+    this.root.addEventListener('keydown', function (event) {
+      if (event.key !== 'Escape' || !self.isDiscardConfirmationOpen()) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      self.hideDiscardConfirmation();
+    }, true);
     this.root.addEventListener('cancel', function (event) {
       event.preventDefault();
-      self.close();
+      if (self.isDiscardConfirmationOpen()) self.hideDiscardConfirmation();
+      else self.requestClose();
+    });
+    this.root.querySelector('[data-discard-cancel]').addEventListener('click', function () { self.hideDiscardConfirmation(); });
+    this.root.querySelector('[data-discard-confirm]').addEventListener('click', function () { self.discardAndClose(); });
+    this.root.querySelector('[data-discard-dialog]').addEventListener('keydown', function (event) {
+      if (event.key !== 'Tab') return;
+      var focusable = Array.from(event.currentTarget.querySelectorAll('button:not([disabled])'));
+      if (!focusable.length) return;
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     });
 
     this.root.querySelector('[data-character-create]').addEventListener('click', function () { self.createCharacter(); });
     this.root.querySelector('[data-character-skip]').addEventListener('click', function () { self.goToZones(); });
     this.root.querySelector('[data-back-to-character]').addEventListener('click', function () { self.showStep('character'); });
     this.root.querySelector('[data-zone-continue]').addEventListener('click', function () { self.openFrontEditor(); });
+    this.root.querySelector('[data-canvas-wrap]').addEventListener('wheel', function (event) {
+      if (!window.matchMedia('(max-width: 900px) and (orientation: portrait)').matches) return;
+      var body = self.root.querySelector('.customizer-body');
+      var previousScrollTop = body.scrollTop;
+      body.scrollTop += event.deltaY;
+      if (body.scrollTop === previousScrollTop) return;
+      event.preventDefault();
+      event.stopPropagation();
+    }, { passive: false });
     this.root.querySelector('[data-editor-zones]').addEventListener('click', function (event) {
       var button = event.target.closest('[data-editor-zone-id]');
       if (button) self.canvasEditor.setActiveZone(button.dataset.editorZoneId);
@@ -1232,7 +1397,10 @@
     this.root.querySelector('[data-add-back]').addEventListener('click', function () { self.chooseAddBack(); });
     this.root.querySelector('[data-back-same]').addEventListener('click', function () { self.startBackSame(); });
     this.root.querySelector('[data-back-different]').addEventListener('click', function () { self.startBackDifferent(); });
-    this.root.querySelector('[data-back-mode-back]').addEventListener('click', function () { self.showStep('back-choice'); });
+    this.root.querySelector('[data-back-mode-back]').addEventListener('click', function () {
+      if (self.isSameOnlyBackDesign()) self.startBackSame();
+      else self.showStep('back-choice');
+    });
     this.root.querySelector('[data-back-zone-mode]').addEventListener('click', function () { self.showStep('back-mode'); });
     this.root.querySelector('[data-back-zone-continue]').addEventListener('click', function () { self.openBackEditor(); });
     this.root.querySelector('[data-add-to-cart]').addEventListener('click', function () { self.addToCart(); });
@@ -1344,6 +1512,7 @@
 
   CustomizerController.prototype.close = function () {
     if (this.isProcessing) return;
+    this.hideDiscardConfirmation(false);
     this.closeStickerPicker();
     if (this.dialog.open) this.dialog.close();
     this.canvasEditor.dispose();
@@ -1351,8 +1520,45 @@
     this.revokeObjectUrls();
   };
 
+  CustomizerController.prototype.requestClose = function () {
+    if (this.isProcessing || this.isDiscardConfirmationOpen()) return;
+    if (this.isDirty) {
+      this.showDiscardConfirmation();
+      return;
+    }
+    this.close();
+  };
+
+  CustomizerController.prototype.isDiscardConfirmationOpen = function () {
+    return !this.root.querySelector('[data-discard-overlay]').hidden;
+  };
+
+  CustomizerController.prototype.showDiscardConfirmation = function () {
+    this.closeStickerPicker();
+    this.root.querySelector('.customizer-shell').inert = true;
+    var overlay = this.root.querySelector('[data-discard-overlay]');
+    overlay.hidden = false;
+    this.root.querySelector('[data-discard-cancel]').focus();
+  };
+
+  CustomizerController.prototype.hideDiscardConfirmation = function (restoreFocus) {
+    var overlay = this.root.querySelector('[data-discard-overlay]');
+    if (overlay.hidden) return;
+    overlay.hidden = true;
+    this.root.querySelector('.customizer-shell').inert = this.isProcessing;
+    if (restoreFocus !== false && this.dialog.open) this.closeButton.focus();
+  };
+
+  CustomizerController.prototype.discardAndClose = function () {
+    if (this.isProcessing) return;
+    this.hideDiscardConfirmation(false);
+    this.reset();
+    this.close();
+  };
+
   CustomizerController.prototype.reset = function () {
     this.canvasEditor.dispose();
+    this.canvasEditor.zonePositions = { front: {}, back: {} };
     this._selectionBound = false;
     this.revokeObjectUrls();
     this.state = {
@@ -1388,6 +1594,7 @@
     };
     this.pendingEmbroideryTransform = null;
     this.editingEmbroideryPlacement = false;
+    this.isDirty = false;
     this.root.querySelector('[data-character-result]').hidden = true;
     this.root.querySelector('[data-character-preview]').removeAttribute('src');
     this.setStatus('');
@@ -1428,6 +1635,7 @@
     try {
       var blob = await this.characterBuilder.open();
       this.state.characterBlob = blob;
+      this.isDirty = true;
       var url = this.trackUrl(blobUrl(blob));
       this.root.querySelector('[data-character-preview]').src = url;
       this.root.querySelector('[data-character-result]').hidden = false;
@@ -1684,9 +1892,11 @@
       this.updateEditorLabels('front', this.canvasEditor.getActiveZone());
       this.updatePrices();
       this.renderEditorZones();
+      this.isDirty = true;
       return;
     }
     await this.loadEditorSurface('front', this.state.frontZones, false);
+    this.isDirty = true;
   };
 
   CustomizerController.prototype.getAvailableBackZones = function () {
@@ -1777,6 +1987,51 @@
   CustomizerController.prototype.isBackPrintDisabled = function () {
     var back = this.loader.config.back;
     return Boolean(back && back.enabled === false);
+  };
+
+  CustomizerController.prototype.isSameOnlyBackDesign = function () {
+    return this.loader.config.backDesignMode === 'same-only';
+  };
+
+  CustomizerController.prototype.clearBackDesignState = function () {
+    this.state.hasBack = false;
+    this.state.backMode = null;
+    this.state.backZones = [];
+    this.state.backArtworks = {};
+    this.state.backCompositeArtwork = null;
+    this.state.backPreview = null;
+    this.state.backDesignSummary = null;
+    this.state.backEmbroideryText = '';
+    this.state.backEmbroideryTemplateId = null;
+    this.state.backEmbroideryTemplateLabel = null;
+    this.state.backEmbroideryColor = null;
+    this.state.backEmbroideryColorLabel = null;
+    this.state.backEmbroideryArtworkBlob = null;
+  };
+
+  CustomizerController.prototype.updateBackModeChoice = function () {
+    var sameOnly = this.isSameOnlyBackDesign();
+    var sameButton = this.root.querySelector('[data-back-same]');
+    var differentButton = this.root.querySelector('[data-back-different]');
+    var continueButton = this.root.querySelector('[data-back-mode-back]');
+    var description = this.root.querySelector('[data-back-mode-description]');
+    var choiceGrid = sameButton && sameButton.parentElement;
+
+    if (differentButton) differentButton.hidden = sameOnly;
+    if (sameButton) {
+      sameButton.classList.toggle('is-selected', sameOnly);
+      sameButton.setAttribute('aria-pressed', sameOnly ? 'true' : 'false');
+    }
+    if (continueButton) {
+      continueButton.textContent = sameOnly ? 'Continue' : 'Back';
+      continueButton.classList.toggle('button--secondary', !sameOnly);
+    }
+    if (description && sameOnly) {
+      description.textContent = this.isEmbroidery
+        ? 'Desain Bordir depan akan disalin ke posisi belakang yang sesuai dan tidak dapat diedit terpisah.'
+        : 'The Front artwork will be copied to the matching Back positions and cannot be edited separately.';
+    }
+    if (choiceGrid) choiceGrid.classList.toggle('is-single-choice', sameOnly);
   };
 
   CustomizerController.prototype.updateBackChoice = function (backAvailable) {
@@ -2226,15 +2481,16 @@
       if (backAvailable) {
         var sameBackZones = this.getSameBackZones();
         var sameBackFee = sameBackZones.reduce(function (total, zone) { return total + Number(zone.price || 0); }, 0);
+        var sameOnly = this.isSameOnlyBackDesign();
         this.root.querySelector('[data-back-price-message]').textContent = this.isEmbroidery
           ? 'Salin Bordir depan ke belakang dengan biaya +' + formatCurrency(sameBackFee, this.loader.product.currency) +
-            ', atau pilih posisi dan desain Bordir belakang yang berbeda.'
+            (sameOnly ? '.' : ', atau pilih posisi dan desain Bordir belakang yang berbeda.')
           : 'Copy the Front design to the Back for +' + formatCurrency(sameBackFee, this.loader.product.currency) +
-            ', or choose different Back positions and pricing.';
+            (sameOnly ? '.' : ', or choose different Back positions and pricing.');
         var backDescription = this.root.querySelector('[data-back-choice-description]');
         if (backDescription) backDescription.textContent = this.isEmbroidery
-          ? 'Pilih salinan Bordir yang identik atau desain posisi belakang secara terpisah.'
-          : 'Choose an identical locked copy or design selected Back positions separately.';
+          ? (sameOnly ? 'Gunakan salinan Bordir yang identik dan terkunci.' : 'Pilih salinan Bordir yang identik atau desain posisi belakang secara terpisah.')
+          : (sameOnly ? 'Use an identical locked copy of the Front artwork.' : 'Choose an identical locked copy or design selected Back positions separately.');
         this.showStep('back-choice');
       } else if (this.isBackPrintDisabled()) {
         this.root.querySelector('[data-back-price-message]').textContent = '';
@@ -2249,13 +2505,7 @@
   };
 
   CustomizerController.prototype.chooseFrontOnly = function () {
-    this.state.hasBack = false;
-    this.state.backMode = null;
-    this.state.backZones = [];
-    this.state.backArtworks = {};
-    this.state.backCompositeArtwork = null;
-    this.state.backPreview = null;
-    this.state.backDesignSummary = null;
+    this.clearBackDesignState();
     this.goReview();
   };
 
@@ -2273,7 +2523,9 @@
       this.setStatus('Back printing is enabled but this variant has no custom.customizer_back_mockup image.', true);
       return;
     }
-    this.state.hasBack = false;
+    if (this.isSameOnlyBackDesign()) this.clearBackDesignState();
+    else this.state.hasBack = false;
+    this.updateBackModeChoice();
     this.showStep('back-mode');
   };
 
@@ -2333,6 +2585,12 @@
   };
 
   CustomizerController.prototype.startBackDifferent = function () {
+    if (this.isSameOnlyBackDesign()) {
+      this.clearBackDesignState();
+      this.updateBackModeChoice();
+      this.showStep('back-mode');
+      return;
+    }
     var switchingMode = this.state.backMode !== 'different';
     this.setStatus('');
     this.state.backMode = 'different';
@@ -2461,9 +2719,11 @@
       this.updateEditorLabels('back', this.canvasEditor.getActiveZone());
       this.updatePrices();
       this.renderEditorZones();
+      this.isDirty = true;
       return;
     }
     await this.loadEditorSurface('back', this.state.backZones, false);
+    this.isDirty = true;
   };
 
   CustomizerController.prototype.finishBack = function () {

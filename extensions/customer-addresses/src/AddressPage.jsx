@@ -7,6 +7,13 @@ import {FullScreenError, FullScreenLoader} from './PageStates.jsx';
 const API_BASE = 'https://bpefhxamltfxunxfvnwc.supabase.co/functions/v1/shopify-app-proxy/customer-account';
 const INITIAL_LOAD_TIMEOUT_MS = 15000;
 
+const alphabetic = (values, field) => [...values].sort((left, right) =>
+  String(left?.[field] || '').localeCompare(String(right?.[field] || ''), 'id-ID', {
+    sensitivity: 'base',
+    numeric: true,
+  }),
+);
+
 class RequestError extends Error {
   status = 0;
 
@@ -131,7 +138,7 @@ function Extension() {
   async function fetchAddresses(sessionToken = '', signal = undefined) {
     const payload = await api('/addresses', {signal}, sessionToken);
     if (!Array.isArray(payload.data)) throw new Error('Invalid address response.');
-    return payload.data;
+    return alphabetic(payload.data, 'label');
   }
 
   async function loadAddresses() {
@@ -151,7 +158,7 @@ function Extension() {
     if (level === 'subdistricts') query.set('district_id', parentId);
     const payload = await api(`/locations/${level}${query.size ? `?${query}` : ''}`, {signal}, sessionToken);
     if (!Array.isArray(payload.data)) throw new Error('Invalid location response.');
-    return payload.data;
+    return alphabetic(payload.data, 'name');
   }
 
   async function loadLocations(level, parentId = '') {

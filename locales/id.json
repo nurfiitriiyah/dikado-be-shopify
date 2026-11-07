@@ -91,6 +91,8 @@
       "other": "Lihat {{ count }} item"
     },
     "view_all": "Lihat semua",
+    "view_preview": "Lihat preview",
+    "preview_zoom_hint": "Cubit, scroll, atau geser untuk memeriksa preview",
     "add": "Tambah",
     "choose": "Pilih",
     "added": "Ditambahkan",

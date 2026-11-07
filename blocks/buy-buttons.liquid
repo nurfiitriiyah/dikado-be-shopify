@@ -71,17 +71,20 @@
           style="{% render 'spacing-style', settings: block_settings %}"
           ref="productFormButtons"
         >
-          {% if product.metafields.custom.customizer_enabled.value == true %}
+          {% assign personalization_type = product.metafields.custom.dikado_personalization_type.value | strip %}
+          {% if personalization_type == blank and product.metafields.custom.customizer_enabled.value == true %}{% assign personalization_type = 'design_editor' %}{% endif %}
+          {% if personalization_type == 'design_editor' or personalization_type == 'photo_upload' %}
             <button
               type="button"
               class="button button--secondary quick-add-customize-button"
-              data-quick-customizer-link
+              {% if personalization_type == 'photo_upload' %}data-photo-upload-open{% else %}data-quick-customizer-link{% endif %}
               data-product-url="{{ product.url }}"
             >
               Customize This Product
             </button>
           {% endif %}
 
+          {% unless personalization_type == 'photo_upload' %}
           {%- liquid
             assign has_quantity_rules = false
             if variant.quantity_rule.min > 1 or variant.quantity_rule.increment > 1 or variant.quantity_rule.max != null
@@ -240,6 +243,7 @@
             can_add_to_cart: can_add_to_cart,
             form_obj: form
           %}
+          {% endunless %}
         </div>
       {%- endform -%}
     </product-form-component>

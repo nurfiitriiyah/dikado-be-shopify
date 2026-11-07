@@ -248,7 +248,7 @@
     var result = await request('', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ cart_snapshot: snapshot, expected_snapshot_version: expectedVersion })
+      body: JSON.stringify({ cart_snapshot: snapshot, cart_token: cart.token, expected_snapshot_version: expectedVersion })
     });
     if (result.status === 409) {
       if (retryLocalOnConflict && result.data) {

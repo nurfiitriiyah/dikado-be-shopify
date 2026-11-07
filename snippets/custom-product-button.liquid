@@ -9,11 +9,18 @@
   %}
 {% endcomment %}
 
-{% if product and product.metafields.custom.customizer_enabled.value == true %}
+{% liquid
+  assign personalization_type = product.metafields.custom.dikado_personalization_type.value | strip
+  if personalization_type == blank and product.metafields.custom.customizer_enabled.value == true
+    assign personalization_type = 'design_editor'
+  endif
+%}
+{% if product and personalization_type == 'design_editor' or product and personalization_type == 'photo_upload' %}
   <button
     type="button"
     class="button button--secondary customizer-launch-button"
-    data-customizer-open
+    {% if personalization_type == 'photo_upload' %}data-photo-upload-open{% else %}data-customizer-open{% endif %}
+    data-personalization-type="{{ personalization_type | escape }}"
     data-product-id="{{ product.id }}"
     data-product-handle="{{ product.handle | escape }}"
     data-product-url="{{ product.url }}"

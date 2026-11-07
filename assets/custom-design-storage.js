@@ -7,6 +7,8 @@
   var ALLOWED_TYPES = ['image/png', 'image/webp'];
   var WATERMARK_TEXT = 'CUSTOM PREVIEW · dikado.in';
   var downloadUrls = new WeakMap();
+  var previewUrls = new WeakMap();
+  var designViewer;
 
   function installWatermarkStyles() {
     if (document.getElementById('custom-design-watermark-styles')) return;
@@ -34,6 +36,95 @@
     image.dataset.clientWatermarked = 'true';
   }
 
+  function ensureDesignViewer() {
+    if (designViewer) return designViewer;
+    var dialog = document.createElement('dialog');
+    dialog.className = 'photo-cart-viewer';
+    dialog.innerHTML = '<div class="photo-cart-viewer__header"><h2></h2><button class="photo-cart-viewer__close" type="button"><span aria-hidden="true">&times;</span></button></div><div class="photo-cart-viewer__viewport"><div class="photo-cart-viewer__stage"></div></div><p class="photo-cart-viewer__hint"></p>';
+    document.body.appendChild(dialog);
+
+    var title = dialog.querySelector('h2');
+    var close = dialog.querySelector('.photo-cart-viewer__close');
+    var viewport = dialog.querySelector('.photo-cart-viewer__viewport');
+    var stage = dialog.querySelector('.photo-cart-viewer__stage');
+    var hint = dialog.querySelector('.photo-cart-viewer__hint');
+    var pointers = new Map();
+    var state = { zoom: 1, x: 0, y: 0, dragX: 0, dragY: 0, pinchDistance: 0, pinchZoom: 1 };
+
+    function transform() {
+      var limit = Math.max(0, viewport.clientWidth * (state.zoom - 1) / 2);
+      state.x = Math.max(-limit, Math.min(limit, state.x));
+      state.y = Math.max(-limit, Math.min(limit, state.y));
+      stage.style.transform = 'translate(' + state.x + 'px,' + state.y + 'px) scale(' + state.zoom + ')';
+    }
+    function reset() {
+      pointers.clear();
+      state.zoom = 1; state.x = 0; state.y = 0; state.pinchDistance = 0;
+      transform();
+    }
+    function distance() {
+      var points = Array.from(pointers.values());
+      return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+    }
+
+    close.addEventListener('click', function () { dialog.close(); });
+    dialog.addEventListener('click', function (event) { if (event.target === dialog) dialog.close(); });
+    dialog.addEventListener('close', reset);
+    viewport.addEventListener('wheel', function (event) {
+      event.preventDefault();
+      state.zoom = Math.max(1, Math.min(4, state.zoom * (event.deltaY < 0 ? 1.12 : 0.89)));
+      if (state.zoom === 1) { state.x = 0; state.y = 0; }
+      transform();
+    }, { passive: false });
+    viewport.addEventListener('pointerdown', function (event) {
+      viewport.setPointerCapture(event.pointerId);
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      viewport.classList.add('is-dragging');
+      if (pointers.size === 1) { state.dragX = event.clientX - state.x; state.dragY = event.clientY - state.y; }
+      if (pointers.size === 2) { state.pinchDistance = distance(); state.pinchZoom = state.zoom; }
+    });
+    viewport.addEventListener('pointermove', function (event) {
+      if (!pointers.has(event.pointerId)) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size === 2) {
+        state.zoom = Math.max(1, Math.min(4, state.pinchZoom * distance() / Math.max(1, state.pinchDistance)));
+      } else if (pointers.size === 1 && state.zoom > 1) {
+        state.x = event.clientX - state.dragX;
+        state.y = event.clientY - state.dragY;
+      }
+      transform();
+    });
+    function release(event) {
+      pointers.delete(event.pointerId);
+      if (!pointers.size) viewport.classList.remove('is-dragging');
+      if (pointers.size === 1) {
+        var point = Array.from(pointers.values())[0];
+        state.dragX = point.x - state.x; state.dragY = point.y - state.y;
+      }
+    }
+    viewport.addEventListener('pointerup', release);
+    viewport.addEventListener('pointercancel', release);
+
+    designViewer = {
+      open: function (url, labels) {
+        title.textContent = labels.title;
+        hint.textContent = labels.hint;
+        close.setAttribute('aria-label', labels.close);
+        stage.textContent = '';
+        var image = document.createElement('img');
+        image.src = url;
+        image.alt = labels.title;
+        image.draggable = false;
+        image.style.cssText = 'display:block;width:100%;height:100%;object-fit:contain;user-select:none';
+        stage.appendChild(image);
+        applyWatermark(image);
+        reset();
+        dialog.showModal();
+      }
+    };
+    return designViewer;
+  }
+
   async function request(path, options) {
     var requestOptions = Object.assign({
       credentials: 'same-origin',
@@ -42,7 +133,7 @@
     var response = await fetch(API + (path || ''), requestOptions);
     var result = await response.json().catch(function () { return {}; });
     if (response.status === 401 && result.error === 'Customer login required') {
-      throw new Error('Please sign in to save your design, then refresh this page and try again.');
+      throw new Error('Kamu belom login :( .. Login dulu ya sayang ');
     }
     if (!response.ok) throw new Error(result.error || 'Design service is temporarily unavailable.');
     return result.data;
@@ -123,6 +214,13 @@
           }
           link.href = '#';
           downloadUrls.set(link, url);
+        });
+        node.querySelectorAll('[data-design-view]').forEach(function (button) {
+          var side = button.dataset.designView === 'back' ? 'back' : 'front';
+          var url = side === 'back' ? design.back_url : design.front_url;
+          if (!url) { button.hidden = true; return; }
+          previewUrls.set(button, url);
+          button.disabled = false;
         });
         node.removeAttribute('data-design-error');
       } catch (_) {
@@ -208,6 +306,20 @@
 
   window.CustomDesignStorage = { save: save, get: get, list: list, validate: validate, renderPreviews: renderPreviews, applyWatermark: applyWatermark };
   document.addEventListener('click', function (event) {
+    var previewButton = event.target.closest('[data-design-view]');
+    if (previewButton) {
+      event.preventDefault();
+      var url = previewUrls.get(previewButton);
+      if (!url) return;
+      var container = previewButton.closest('[data-custom-design-preview]');
+      var side = previewButton.dataset.designView === 'back' ? 'belakang' : 'depan';
+      ensureDesignViewer().open(url, {
+        title: 'Preview desain ' + side,
+        hint: container.dataset.designPreviewHint || '',
+        close: container.dataset.designPreviewClose || 'Tutup'
+      });
+      return;
+    }
     var link = event.target.closest('[data-design-download]');
     if (!link) return;
     event.preventDefault();

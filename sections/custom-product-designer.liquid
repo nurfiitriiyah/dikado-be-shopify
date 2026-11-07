@@ -6,6 +6,7 @@
 {% endcomment %}
 
 {{ 'custom-product-designer.css' | asset_url | stylesheet_tag }}
+{{ 'photo-upload-personalization.css' | asset_url | stylesheet_tag }}
 {{ 'embroidery-design-builder.css' | asset_url | stylesheet_tag }}
 {{ 'bp-character-builder.css' | asset_url | stylesheet_tag }}
 <script src="{{ 'bp-character-builder.js' | asset_url }}" defer="defer"></script>
@@ -14,8 +15,36 @@
 <script src="{{ 'custom-design-storage.js' | asset_url }}" defer="defer"></script>
 <script src="{{ 'embroidery-design-builder.js' | asset_url }}" defer="defer"></script>
 <script src="{{ 'custom-product-designer.js' | asset_url }}" defer="defer"></script>
+<script src="{{ 'photo-upload-personalization.js' | asset_url }}" defer="defer"></script>
 
-{% if product and product.metafields.custom.customizer_enabled.value == true %}
+{% liquid
+  assign personalization_type = product.metafields.custom.dikado_personalization_type.value | strip
+  if personalization_type == blank and product.metafields.custom.customizer_enabled.value == true
+    assign personalization_type = 'design_editor'
+  endif
+%}
+
+{% if product and personalization_type == 'photo_upload' %}
+  <script id="photo-upload-config-{{ section.id }}" type="application/json">{{ product.metafields.custom.dikado_photo_template.value | json }}</script>
+  <script id="photo-upload-product-{{ section.id }}" type="application/json">
+    {"productId":{{ product.id | json }},"title":{{ product.title | json }},"variants":{
+    {% for variant in product.variants %}"{{ variant.id }}":{"id":{{ variant.id | json }},"title":{{ variant.title | json }},"available":{{ variant.available | json }}}{% unless forloop.last %},{% endunless %}{% endfor %}}}
+  </script>
+  <dialog class="photo-upload-dialog" data-photo-upload-dialog data-section-id="{{ section.id }}" data-config-script="photo-upload-config-{{ section.id }}" data-product-script="photo-upload-product-{{ section.id }}" aria-labelledby="PhotoUploadTitle-{{ section.id }}">
+    <form method="dialog" class="photo-upload-shell" data-photo-upload-form>
+      <header class="photo-upload-header"><div><p class="photo-upload-eyebrow">Personalize</p><h2 id="PhotoUploadTitle-{{ section.id }}">Choose Your Picture</h2><p data-photo-upload-variant></p></div><button type="button" class="photo-upload-close" data-photo-upload-close aria-label="Close photo upload">×</button></header>
+      <div class="photo-upload-controls">
+        <label class="photo-upload-dropzone" data-photo-upload-dropzone><span>Upload photo</span><small>JPEG, PNG, or WebP · maximum 20 MB</small><input type="file" accept="image/jpeg,image/png,image/webp" data-photo-upload-input></label>
+        <label class="photo-upload-zoom" data-photo-upload-zoom hidden><span>Zoom</span><input type="range" min="1" max="3" step="0.01" value="1" data-photo-upload-zoom-input aria-label="Zoom photo"></label>
+        <div class="photo-upload-actions"><button type="button" class="button button--secondary" data-photo-upload-change hidden>Change photo</button><button type="button" class="button button--secondary" data-photo-upload-remove hidden>Remove</button><button type="submit" class="button" data-photo-upload-submit disabled>Add to cart</button></div>
+        <p class="photo-upload-status" data-photo-upload-status role="status" aria-live="polite"></p>
+      </div>
+      <div class="photo-upload-preview" data-photo-upload-preview aria-label="Photo preview"><img data-photo-upload-template alt="" width="1" height="1" hidden><div class="photo-upload-frame" data-photo-upload-frame><img data-photo-upload-image alt="Your uploaded picture" width="1" height="1" draggable="false" hidden></div><img data-photo-upload-overlay alt="" width="1" height="1" hidden></div>
+    </form>
+  </dialog>
+{% endif %}
+
+{% if product and personalization_type == 'design_editor' %}
   {% liquid
     assign is_embroidery = false
     if product.metafields.custom.custom_bordir.value == true
@@ -193,6 +222,24 @@
       <span class="customizer-processing-spinner" aria-hidden="true"></span>
       <strong data-processing-title>Adding your custom product…</strong>
       <span data-processing-message>Please wait. Don’t close this window.</span>
+    </div>
+
+    <div class="customizer-discard-overlay" data-discard-overlay hidden>
+      <div
+        class="customizer-discard-dialog"
+        data-discard-dialog
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="CustomizerDiscardTitle-{{ section.id }}"
+        aria-describedby="CustomizerDiscardDescription-{{ section.id }}"
+      >
+        <h3 id="CustomizerDiscardTitle-{{ section.id }}">Dibatalin nih?</h3>
+        <p id="CustomizerDiscardDescription-{{ section.id }}">Desain yang udah kamu buat bakal hilang kalau pop up di close</p>
+        <div class="customizer-discard-actions">
+          <button type="button" class="button button--secondary" data-discard-cancel>Lanjut Mendesain</button>
+          <button type="button" class="button customizer-destructive-button" data-discard-confirm>Hapus &amp; Tutup</button>
+        </div>
+      </div>
     </div>
 
     <div class="customizer-shell">
@@ -434,13 +481,13 @@
           <div class="customizer-centered-card">
             <span class="customizer-step-number">5</span>
             <h3>{% if is_embroidery %}Desain Bordir belakang{% else %}Design the back{% endif %}</h3>
-            <p>{% if is_embroidery %}Gunakan ulang desain Bordir depan atau buat desain teks yang berbeda untuk belakang.{% else %}Reuse the flattened front artwork or create a different back design.{% endif %}</p>
+            <p data-back-mode-description>{% if is_embroidery %}Gunakan ulang desain Bordir depan atau buat desain teks yang berbeda untuk belakang.{% else %}Reuse the flattened front artwork or create a different back design.{% endif %}</p>
             <div class="customizer-choice-grid">
-              <button type="button" class="customizer-choice-card" data-back-same>
+              <button type="button" class="customizer-choice-card" data-back-same aria-pressed="false">
                 <strong>{% if is_embroidery %}Gunakan Bordir yang Sama dengan Depan{% else %}Use Same Design as Front{% endif %}</strong>
                 <span>{% if is_embroidery %}Salin desain Bordir depan ke posisi belakang yang sesuai. Desain belakang akan identik dan tidak dapat diedit.{% else %}Copy all Front print areas to the matching Back positions. The Back design will be identical and cannot be edited.{% endif %}</span>
               </button>
-              <button type="button" class="customizer-choice-card" data-back-different>
+              <button type="button" class="customizer-choice-card" data-back-different aria-pressed="false">
                 <strong>{% if is_embroidery %}Buat Bordir Belakang yang Berbeda{% else %}Create Different Back Design{% endif %}</strong>
                 <span>{% if is_embroidery %}Buat desain Bordir terpisah, lalu pilih satu posisi belakang.{% else %}Choose one or more Back print positions, then create a separate Back design.{% endif %}</span>
               </button>

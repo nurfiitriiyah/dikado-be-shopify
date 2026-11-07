@@ -13,96 +13,106 @@ export default async () => {
 function DesignDownload() {
   const line = shopify.target.value;
   const orderId = shopify.order.value?.id || '';
-  const variantId = line.merchandise.id;
-  const customization = attributeValue(line.attributes, 'Customization').toLowerCase();
-  const isCustomProduct = customization.includes('custom design') || Boolean(
-    attributeValue(line.attributes, 'Front print areas') ||
-    attributeValue(line.attributes, 'Back print areas') ||
-    attributeValue(line.attributes, 'Area bordir'),
-  );
-  const [state, setState] = useState({status: 'loading', design: null, message: ''});
+  const itemType = attributeValue(line.attributes, '_item_type', 'Item Type');
+  const designId = attributeValue(line.attributes, '_design_id', 'Design ID');
+  const photoUploadId = attributeValue(line.attributes, '_photo_upload_id', 'Photo Upload ID') ||
+    attributeValue(line.attributes, '_dikado_photo_upload_id', 'Dikado Photo Upload ID');
+  const fileKind = itemType === 'print_fee' ? '' : designId ? 'design' : photoUploadId ? 'photo' : '';
+  const [state, setState] = useState({status: 'loading', data: null});
 
   useEffect(() => {
-    if (!isCustomProduct) {
-      setState({status: 'hidden', design: null, message: ''});
+    if (!fileKind) {
+      setState({status: 'hidden', data: null});
       return;
     }
-    if (!orderId || !variantId) {
-      setState({status: 'error', design: null, message: 'Data order belum tersedia.'});
+    const fileId = designId || photoUploadId;
+    if (!orderId || !fileId) {
+      setState({status: 'error', data: null});
       return;
     }
 
     let active = true;
-    setState({status: 'loading', design: null, message: ''});
-    loadDesign(orderId, variantId)
-      .then((design) => {
-        if (active) setState({status: 'ready', design, message: ''});
+    setState({status: 'loading', data: null});
+    loadFiles(orderId, fileKind, fileId)
+      .then((data) => {
+        if (active) setState({status: 'ready', data});
       })
-      .catch((error) => {
+      .catch(() => {
         if (active) {
-          setState({
-            status: 'error',
-            design: null,
-            message: error?.message || 'Desain belum dapat diunduh.',
-          });
+          setState({status: 'error', data: null});
         }
       });
     return () => {
       active = false;
     };
-  }, [isCustomProduct, orderId, variantId]);
+  }, [fileKind, orderId, designId, photoUploadId]);
 
   if (state.status === 'hidden') return null;
   if (state.status === 'loading') {
     return (
       <s-stack direction="inline" gap="small" alignItems="center">
-        <s-spinner size="small" accessibilityLabel="Menyiapkan download desain" />
-        <s-text color="subdued">Menyiapkan download desain...</s-text>
+        <s-spinner size="small" accessibilityLabel="Menyiapkan file download" />
+        <s-text color="subdued">Menyiapkan file download...</s-text>
       </s-stack>
     );
   }
   if (state.status === 'error') {
-    return <s-text color="subdued">{state.message}</s-text>;
+    return <MissingMessage kind={fileKind} side="front" />;
   }
 
-  const {front_url: frontUrl, back_url: backUrl} = state.design;
-  if (!frontUrl) return null;
+  if (state.data.kind === 'photo') {
+    const original = state.data.files.original;
+    return original?.url ? (
+      <s-link href={original.url}>Download foto asli</s-link>
+    ) : <MissingMessage kind="photo" />;
+  }
+  if (state.data.kind !== 'design') {
+    return <MissingMessage kind={fileKind} side="front" />;
+  }
+
+  const {front, back} = state.data.files;
 
   return (
     <s-stack direction="block" gap="small">
-      <s-text type="strong">Desain custom</s-text>
-      <s-button-group>
-        <s-button href={frontUrl} variant="secondary">
-          {backUrl ? 'Download desain depan' : 'Download desain'}
-        </s-button>
-        {backUrl ? (
-          <s-button href={backUrl} variant="secondary">
+      <s-stack direction="inline" gap="base">
+        {front?.url ? <s-link href={front.url}>Download desain depan</s-link> : null}
+        {back?.url ? (
+          <s-link href={back.url}>
             Download desain belakang
-          </s-button>
+          </s-link>
         ) : null}
-      </s-button-group>
+      </s-stack>
+      {!front?.url ? <MissingMessage kind="design" side="front" /> : null}
+      {back && !back.url ? <MissingMessage kind="design" side="back" /> : null}
     </s-stack>
   );
 }
 
-function attributeValue(attributes, key) {
-  return attributes?.find((attribute) => attribute.key === key)?.value || '';
+function MissingMessage({kind, side}) {
+  const message = kind === 'photo'
+    ? 'File tidak ditemukan, silakan '
+    : `File desain ${side === 'back' ? 'belakang' : 'depan'} tidak ditemukan, silakan `;
+  return <s-text color="subdued">{message}<s-link href="/pages/contact">hubungi admin</s-link>.</s-text>;
 }
 
-function loadDesign(orderId, variantId) {
-  const requestKey = `${orderId}:${variantId}`;
+function attributeValue(attributes, ...keys) {
+  return attributes?.find((attribute) => keys.includes(attribute.key))?.value || '';
+}
+
+function loadFiles(orderId, fileType, fileId) {
+  const requestKey = `${orderId}:${fileType}:${fileId}`;
   if (!designRequests.has(requestKey)) {
-    designRequests.set(requestKey, requestDesign(orderId, variantId));
+    designRequests.set(requestKey, requestFiles(orderId, fileType, fileId));
   }
   return designRequests.get(requestKey);
 }
 
-async function requestDesign(orderId, variantId) {
+async function requestFiles(orderId, fileType, fileId) {
   const token = await shopify.sessionToken.get();
   const query = new URLSearchParams({
     order_id: orderId,
-    variant_id: variantId,
-    occurrence: '0',
+    file_type: fileType,
+    file_id: fileId,
   });
   const response = await fetch(`${API_BASE}/orders/design-download?${query}`, {
     headers: {Authorization: `Bearer ${token}`},
